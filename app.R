@@ -245,14 +245,14 @@ server <- function(input, output) {
         Data   <- MultiPertData()
         X <- seq(min(Data$X), max(Data$X), length.out = nrow(Data) / nlevels(Data$Group))
         Y <- rowsum(Data$Y, Data$X) / nlevels(Data$Group)
-        Data <- data.frame(X = X, Y = Y) #Y = distr::d(MultiPertFunc())(X))
+        Data <- data.frame(X = X, Y = Y) 
         
         # Compute 50% "integral", i.e. quantile
-        Avg50p <- Area50P(X, Y)
+        Avg50p  <- Area50P(X, Y)
         # Mean
-        AvgMean <- sum(apply(Data, 1, prod)) / sum(Data$Y)
+        AvgMean <- AvgOfDensities(X, Y)
         # Var
-        Variance <- sum(apply(Data, 1, function(x) (prod(x)/sum(Data$Y))^2)) / AvgMean^2
+        Variance <- VarOfDensities(X, Y) # sum(apply(Data, 1, function(x) (prod(x) / sum(Data$Y) - AvgMean)^2 ))
         print(Variance)
         
         # plot PERT distribution

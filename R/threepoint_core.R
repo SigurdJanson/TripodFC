@@ -289,17 +289,17 @@ PoolOpinions <- function( Values, Weights = rep(1/nrow(Values), nrow(Values)),
 #' Area50P
 #' Computes the average of the integral function based on empirical data.
 #' @param X A numeric vector
-#' @param Values 'histogram' data, i.e. observations based on some probability distribution
-#' (\code{Values = f(X)} with \code{f} being an arbitrary density function).
+#' @param dX 'histogram' data, i.e. observations based on some probability distribution
+#' (\code{dX = f(X)} with \code{f} being an arbitrary density function).
 #' @return The value of \code{X} at which the integral of the probability distribution 
 #' exceeds 50% of it's area.
-Area50P <- function(X, Values) {
-  if(length(X) != length(Values)) stop("X and Values must have the same length")
+Area50P <- function(X, dX) {
+  if(length(X) != length(dX)) stop("X and Values must have the same length")
   if(length(X) == 1) {
     warning("A distribution of length 1 cannot be divided in half")
     return(1)
   }
-  Percentages <- Values / sum(Values)
+  Percentages <- dX / sum(dX)
   Accumulated <- cumsum(Percentages)
   
   # if there is an exact match for 0.5 take this exact index ...
@@ -316,5 +316,62 @@ Area50P <- function(X, Values) {
   }
   
   return(Threshold50)
+}
+
+
+#' .dX2pX 
+#'
+#' @param X 
+#' @param dX Probability desnsities of X
+#' @param Truncated Does the range cover the whole distribution or only a part of it?
+#'
+#' @return
+#' @export
+#'
+#' @examples
+.dX2pX <- function(X, dX, Truncated = FALSE) {
+  Deltas <- range(diff(X)) # Intervals of X
+  #if (diff(Deltas) > .Machine$double.eps/10) stop("Equal steps among X values is required")
+  Deltas <- Deltas[1]
+  if (Truncated)
+    Deltas <- rep(Deltas, length(X))
+  else
+    Deltas <- c(0.5 * Deltas, rep(Deltas, length(X)-2), 0.5 * Deltas)
+  
+  dX * Deltas
+}
+
+#' @title AvgOfDensities
+#' @description Computes the mean of a probability distribution from a series 
+#' of density values.
+#' @inheritParams .dX2pX
+#' @note 
+AvgOfDensities <- function(X, dX, Truncated = FALSE) {
+  Deltas <- range(diff(X)) # Intervals of X
+  #if (diff(Deltas) > .Machine$double.eps/10) stop("Equal steps among X values is required")
+  Deltas <- Deltas[1]
+  if (Truncated)
+    Deltas <- rep(Deltas, length(X))
+  else
+    Deltas <- c(0.5 * Deltas, rep(Deltas, length(X)-2), 0.5 * Deltas)
+  
+  pX <- .dX2pX(X, dX, Truncated)
+  sum(X * pX)
+}
+
+
+
+#' @title VarOfDensities
+#' @description Computes the mean of a probability distribution from a series 
+#' of density values.
+#' @inheritParams .dX2pX
+#' @note 
+VarOfDensities <- function(X, dX, Truncated = FALSE) {
+  pX <- .dX2pX(X, dX, Truncated)
+  Avg <- sum(X * pX)
+  SumOfSquares <- sum(mapply(function(x, y) (x^2*y), X, pX))
+  SumOfSquares - Avg^2
+  #SumOfSquares <- sum(mapply(function(x, y) ((x - Avg)^2*y), X, pX))
+  #SumOfSquares
 }
 
