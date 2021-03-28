@@ -3,12 +3,13 @@
 #' 
 library("shiny")
 library("shinyMatrix")
+library(ggplot2)
 if(!exists("PoolOpinions", mode="function")) 
     source("threepoint_core.R")
 
 #' Constant to define into how many pieces the distribution will be split. 
 #' The more pieces, the more precision.
-Precision <- 100000
+Precision <- 10000
 
 # Define UI for app that draws a histogram ----
 ui <- fluidPage(
@@ -18,7 +19,7 @@ ui <- fluidPage(
     tabsetPanel(
         id = "tabs",
         # Single Panel  ----
-        tabPanel("Single", "Three-point estimation for a single person",
+        tabPanel("Single", h3("Three-Point Estimate of a Single Expert"),
                  sidebarLayout(
                      sidebarPanel(
                          
@@ -48,33 +49,31 @@ ui <- fluidPage(
                  ),
         ),
         # Team Panel  ----
-        tabPanel("Team", "Combined team estimates",
-                 sidebarLayout(
-                     sidebarPanel(
-                         matrixInput("TeamMatrix",
-                                     rows = list(names = TRUE, editableNames = TRUE, extend = TRUE),
-                                     cols = list(names = TRUE, editableNames = FALSE),
-                                     value = matrix(c(11,12,8,9,13,13,10,10,17,16,13,15), 4, 3,
-                                                    dimnames = list(c("Peter", "Jane", "Paul", "Susan"),
-                                                                    c("Optimal", "Typical", "Pessimistic"))),
-                                     #value = matrix(1:6, 2, 3,
-                                     #                dimnames = list(c("MA1", "MA2"),
-                                     #                                c("Opt", "Typ", "Pess"))),
-                                     class = "numeric"
-                         )
-                     ),
-                     # Main panel for displaying outputs ----
-                     mainPanel(
-                         plotOutput(outputId = "MultiPlot"),
-                         #verbatimTextOutput("CombiStats"),
-                         #textOutput(outputId = "CombiAverage"),
-                         #textOutput(outputId = "CombiStdDev"),
-                         #textOutput(outputId = "CombiVar"),
-                         #textOutput(outputId = "CombiSkewness"),
-                         #textOutput(outputId = "CombiKurtosis"),
-                         plotOutput(outputId = "CombiPlot")
+        tabPanel(
+            "Team", h3("Combined Team Estimates"),
+             sidebarLayout(
+                 sidebarPanel(
+                     matrixInput("TeamMatrix",
+                                 rows = list(names = TRUE, editableNames = TRUE, extend = TRUE),
+                                 cols = list(names = TRUE, editableNames = FALSE),
+                                 value = matrix(c(11,12,8,9,13,13,10,10,17,16,13,15), 4, 3,
+                                                dimnames = list(c("Peter", "Jane", "Paul", "Susan"),
+                                                                c("Optimal", "Typical", "Pessimistic"))),
+                                 class = "numeric"
                      )
+                 ),
+                 # Main panel for displaying outputs ----
+                 mainPanel(
+                     plotOutput(outputId = "MultiPlot"),
+                     #verbatimTextOutput("CombiStats"),
+                     #textOutput(outputId = "CombiAverage"),
+                     #textOutput(outputId = "CombiStdDev"),
+                     #textOutput(outputId = "CombiVar"),
+                     #textOutput(outputId = "CombiSkewness"),
+                     #textOutput(outputId = "CombiKurtosis"),
+                     plotOutput(outputId = "CombiPlot")
                  )
+             )
         )
     )#tabsetPanel
 )
@@ -87,6 +86,7 @@ server <- function(input, output) {
     # Single PERT distribution ----
     # with optimistic, typical and pessimistic value
     output$SinglePlot <- renderPlot({
+        # PRECONDITIONS
         shiny::validate(
             need(input$Typical0 > input$Optimistic0,     
                  "'Typical' must be larger than 'Optimistic'"),
@@ -95,97 +95,156 @@ server <- function(input, output) {
         )
         
         X <- seq(input$Optimistic0, input$Pessimistic0, length.out=Precision)
+        Data <- data.frame(X = X, 
+                           Y = dpert(X, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0))
+        
         # plot PERT distribution
-        plot(X, dpert(X, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0),
-             type = "l", 
-             main = "Estimated Distribution", xlab = "Estimate", ylab = "Subjective Probability")
-        
-        # Add the three point estimates (opt., typical, pess.)
-        points(c(input$Optimistic0, input$Typical0, input$Pessimistic0), c(0,0,0), 
-               pch = 17, col = "red", cex = 3)
-        
-        UnitX <- range(X) / 100
-        #unitY #TODO
+        p <- ggplot(Data, aes(x = X, y = Y)) +
+                geom_line() +
+                annotate("point", x = input$Optimistic0, y = 0, size = 5, colour = "blue", alpha = 1/5) +
+                annotate("point", x = input$Typical0, y = max(Data$Y), size = 5, colour = "blue", alpha = 1/5) +
+                annotate("point", x = input$Pessimistic0, y = 0, size = 5, colour = "blue", alpha = 1/5) +
+                ggtitle("Estimated Distribution") +
+                scale_x_continuous(name="Estimate") + scale_y_continuous(name="Subjective Probability")
         
         # Explicit 3-point estimate using the integral
-        Average <- qpert(0.5, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
-        abline(v = Average, col = "blue")
-        text(Average-0.75, y = 0, labels = round(Average, 2), cex = 1, col = "blue")
+        Avg50p <- qpert(0.5, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
+        p <- p + annotate("point", x = Avg50p, y = 0, size = 5, colour = "red", alpha = 1/2) +
+                 geom_vline(aes(xintercept = Avg50p), color = "red", alpha = 1/5) +
+                 annotate("label", hjust = "right", colour = "red", alpha = 5/10,
+                          x = Avg50p, y = max(Data$Y)/20,
+                          label = format(Avg50p, digits = 2L, nsmall = 2L))
         
         # Weighted 3-point estimate
-        Average <- (input$Optimistic0 + 4L*input$Typical0 + input$Pessimistic0) / 6
-        abline(v = Average)
-        text(Average+0.5, y = 0.01, labels = round(Average, 2), cex = 1, col = "black")
+        AvgMean <- (input$Optimistic0 + 4L*input$Typical0 + input$Pessimistic0) / 6
+        p <- p + annotate("point", x = AvgMean, y = 0, size = 5, colour = "green", alpha = 1/2) +
+                 geom_vline(aes(xintercept = AvgMean), color = "green", alpha = 1/5) +
+                 annotate("label", hjust = "left", colour = "green", alpha = 5/10,
+                          x = AvgMean, y = max(Data$Y)/20, 
+                          label = format(AvgMean, digits = 2L, nsmall = 2L))
+        
+        p
+    })
+    
+    
+    MultiPertValues <- reactive({
+        Values <- na.omit( input$TeamMatrix )
+        Estimators <- nrow(Values)
+        # shiny::validate(
+        #     need(Estimators > 0, "I need at least one triple of estimates to show something")
+        # )
+        if (Estimators == 0)
+            return(NULL)
+        else
+            return(Values)
     })
     
     
     # Team Data Set ----
     # Generate the data set required for the Team tab 
     MultiPertData <- reactive({
-        Values <- na.omit( input$TeamMatrix )
-        Estimators <- nrow(Values)
-        shiny::validate(
-            need(Estimators > 0, "I need at least one triple of estimates to show something")
-        )
+        Values <- req(MultiPertValues())
+        
+        X = seq(min(Values), max(Values), length.out=Precision)
+        Data <- data.frame()
+        
+        for (Line in 1:nrow(Values)) {
+            Y <- dpert(X, min = Values[Line, 1], mode=Values[Line, 2], max=Values[Line, 3])
+            GroupName <- ifelse(is.null(rownames(Values)[Line]), Line, rownames(Values)[Line])
+            Group <- rep(rownames(Values)[Line], length(X))
+            Data  <- rbind(Data, data.frame(X = X, Y = Y, Group = Group))
+        }
+        Data$Group <- factor(Data$Group)
+        return(Data)
+    })
+        
+        
+    # Generate the combined probability distributions required for the Team tab 
+    MultiPertFunc <- reactive({
+        Values <- req(MultiPertValues())
         # Values on x axis
-        X <- seq(min(Values), max(Values), length.out = Precision)
+        #X <- seq(min(Values), max(Values), length.out = Precision)
         
         
         # Compute all PERT functions
+        Data = list()
         for(Line in 1:nrow(Values)) {
-            dfunc <- function(x) dpert(x, min  = Values[Line, "Optimal"], 
-                                       mode = Values[Line, "Typical"], 
-                                       max  = Values[Line, "Pessimistic"])
-            D[Line] <- AbscontDistribution(d = dfunc, withgaps = FALSE)#, withStand = TRUE)
+            dfunc <- function(x, log = FALSE) 
+                dpert(x = x, min  = Values[Line, "Optimal"], 
+                      mode = Values[Line, "Typical"], 
+                      max  = Values[Line, "Pessimistic"], 
+                      log = log)
+            pfunc <- function(q, lower.tail = TRUE, log.p = FALSE) 
+                ppert(q = q, min  = Values[Line, "Optimal"], 
+                      mode = Values[Line, "Typical"], 
+                      max  = Values[Line, "Pessimistic"], 
+                      lower.tail = lower.tail, log.p = log.p)
+            qfunc <- function(p, lower.tail = TRUE, log.p = FALSE) 
+                qpert(p = p, min  = Values[Line, "Optimal"],
+                      mode = Values[Line, "Typical"],
+                      max  = Values[Line, "Pessimistic"],
+                      lower.tail = lower.tail, log.p = log.p)
+            rfunc <- function(n) 
+                rpert(n = n, min  = Values[Line, "Optimal"], 
+                      mode = Values[Line, "Typical"], 
+                      max  = Values[Line, "Pessimistic"])
+            Data[[Line]] <- AbscontDistribution(d = dfunc, 
+                                                p = pfunc,
+                                                q = qfunc,
+                                                r = rfunc,
+                                                withgaps = FALSE)#, withStand = TRUE)
         }
-        rownames(Data) <- rownames(Values)
+        names(Data) <- rownames(Values)
         
         # 
         # PooledData <- PoolOpinions(Data, Weights = Weight)
-        MixedDistr <- UnivarMixingDistribution(Norm(3, .25), Norm(1, .5))
+        MixedDistr <- UnivarMixingDistribution(Dlist = Data)#new("DistrList", Data))
         #plot(MixedDistr)
         
         # Add 50% threshold of pooled distribution
-        Threshold50 <- Area50P(X, PooledData)
+        #Threshold50 <- Area50P(X, PooledData)
         
-        
-        list(
-            Estimates = Values,
-            PertData = Data,
-            PooledPertData = PooledData,
-            Threshold50 = Threshold50,
-            XValues = X,         # x axis
-            Weights = Weight
-        )
+        # list(
+        #     Estimates = Values,
+        #     PertData = Data,
+        #     PooledPertData = PooledData,
+        #     Threshold50 = Threshold50,
+        #     XValues = X,         # x axis
+        #     Weights = Weight
+        # )
+        return(MixedDistr)
     })
     
     
     # Multiple Pert distributions ----
     # Plot a chart with several Pert distributions in it 
     output$MultiPlot <- renderPlot({
-        PertData  <- MultiPertData()$PertData
-        Estimates <- MultiPertData()$Estimates
-        X <- MultiPertData()$Xvalues
-        Weights <- MultiPertData()$Weights
+        Data   <- MultiPertData()
+        Values <- MultiPertValues()
         
-        # Determine appropriate size of y-axis
-        MaxY <- max(PertData)
-        # Determine values on x-axis
-        X <- seq( min(Estimates), max(Estimates), length.out = length(PertData[1,]) )
+        shiny::validate(
+            need(Data, "Keine Daten")
+        )
         
-        
-        # plot first PERT distribution
-        plot(X, PertData[1,],
-             type = "l", ylim = c(0, MaxY),
-             main = "Individual Distributions", xlab = "Estimate", ylab = "Subjective Probability")
-        
-        # plot additional distributions
-        if(nrow(PertData) > 1) {
-            for(Line in 2:nrow(PertData))
-                lines(X, PertData[Line,], col="black", lty=Line)
+        # plot combined PERT distribution
+        p <- ggplot(Data, aes(x = X, y = Y, colour = Group)) +
+                    geom_line() +
+                    ggtitle("Estimated Distributions") +
+                    scale_x_continuous(name="Estimate") + 
+                    scale_y_continuous(name="Subjective Probability") +
+                    theme(legend.position="top") + 
+                    scale_fill_discrete(name="Expert")
+                    #+ geom_label(aes(x = 10, y = max(Y), colour = unique(Group), label = unique(Group)))
+
+        for (Line in 1:nrow(Values)) {
+            Name <- rownames(Values)[Line]
+            PosX <- Values[Line, 2] + ((Values[Line, 3] - Values[Line, 1]) * 0.1 )
+            PosY <- dpert(Values[Line, 2], min = Values[Line, 1], mode=Values[Line, 2], max=Values[Line, 3])
+            p <- p + annotate("label", x = PosX, y = PosY, label = Name,
+                              alpha = 3/10)
         }
         
-        legend("topright", legend=rownames( Estimates ), lty=1:nrow(Estimates), cex=0.8)
+        p
     })
     
     
@@ -193,18 +252,33 @@ server <- function(input, output) {
     # Pooled distribution ----
     # Plot a chart after distributions have been pooled together
     output$CombiPlot <- renderPlot({
-        Pooled <- MultiPertData()$PooledPertData
-        Estimates <- MultiPertData()$Estimates
+        Values <- MultiPertValues()
+        Data   <- MultiPertData()
+        X <- seq(min(Data$X), max(Data$X), length.out = nrow(Data) / nlevels(Data$Group))
+        Y <- rowsum(Data$Y, Data$X) / nlevels(Data$Group)
+        Data <- data.frame(X = X, Y = Y) #Y = distr::d(MultiPertFunc())(X))
+        print(sum(Data$Y))
         
-        # Get values for x axis
-        X <- seq( min(Estimates), max(Estimates), length.out = length(Pooled) )
+        # Compute 50p integral
+        Avg50p <- quantile(Y, probs = 0.5) #TODO: FALSCH!!! ecdf()
+        Avg50p <- Area50P(X, Y)
         
-        plot(X, Pooled,
-             type = "l", 
-             main = "Combined Distribution", xlab = "Estimate", ylab = "Subjective Probability")
+        # Mean
+        AvgMean <- sum(apply(Data, 1, prod)) / sum(Data$Y)
         
-        abline(v = MultiPertData()$Threshold50, col = "blue")
-        text(MultiPertData()$Threshold50, y = 0, labels = round(MultiPertData()$Threshold50, 2), cex = 1, col = "blue")
+        # plot PERT distribution
+        p <- ggplot(Data, aes(x = X, y = Y)) +
+            geom_line() +
+            annotate("point", x = min(Values), y = 0, size = 5, colour = "blue", alpha = 1/5) +
+            annotate("point", x = max(Values), y = 0, size = 5, colour = "blue", alpha = 1/5) +
+            annotate("point", x = Avg50p, y = 0, size = 5, colour = "red", alpha = 1/5) +
+            annotate("label", x = Avg50p, y = max(Data$Y)/20, size = 5, colour = "red", alpha = 1/5, label = format(Avg50p, digits = 2L, nsmall = 2L)) +
+            annotate("point", x = AvgMean, y = 0, size = 5, colour = "pink", alpha = 1/5) +
+            annotate("label", x = AvgMean, y = max(Data$Y)/20, size = 5, colour = "pink", alpha = 1/5, label = format(AvgMean, digits = 2L, nsmall = 2L)) +
+            ggtitle("Overall Distribution") +
+            scale_x_continuous(name="Estimate") + scale_y_continuous(name="Subjective Probability")
+        
+        return(p)
     })
     
 }
