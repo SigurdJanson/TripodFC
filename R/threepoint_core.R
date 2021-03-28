@@ -322,7 +322,7 @@ Area50P <- function(X, dX) {
 #' .dX2pX 
 #'
 #' @param X 
-#' @param dX Probability desnsities of X
+#' @param dX Probability densities of X
 #' @param Truncated Does the range cover the whole distribution or only a part of it?
 #'
 #' @return
@@ -347,14 +347,6 @@ Area50P <- function(X, dX) {
 #' @inheritParams .dX2pX
 #' @note 
 AvgOfDensities <- function(X, dX, Truncated = FALSE) {
-  Deltas <- range(diff(X)) # Intervals of X
-  #if (diff(Deltas) > .Machine$double.eps/10) stop("Equal steps among X values is required")
-  Deltas <- Deltas[1]
-  if (Truncated)
-    Deltas <- rep(Deltas, length(X))
-  else
-    Deltas <- c(0.5 * Deltas, rep(Deltas, length(X)-2), 0.5 * Deltas)
-  
   pX <- .dX2pX(X, dX, Truncated)
   sum(X * pX)
 }
