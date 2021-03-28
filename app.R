@@ -22,29 +22,24 @@ ui <- fluidPage(
         tabPanel("Single", h3("Three-Point Estimate of a Single Expert"),
                  sidebarLayout(
                      sidebarPanel(
-                         
                          sliderInput(inputId = "Optimistic0",
-                                     label = "Optimistic:",
-                                     min = 1,
-                                     max = 200,
+                                     label = "Optimistic",
+                                     min = 1, max = 200,
                                      value = 15),
                          sliderInput(inputId = "Typical0",
-                                     label = "Typical:",
-                                     min = 1,
-                                     max = 200,
+                                     label = "Typical",
+                                     min = 1, max = 200,
                                      value = 25,
                                      step = 1),
                          sliderInput(inputId = "Pessimistic0",
-                                     label = "Pessimistic:",
-                                     min = 1,
-                                     max = 200,
+                                     label = "Pessimistic",
+                                     min = 1, max = 200,
                                      value = 50)
                      ), #sidebarPanel
                      
                      # Main panel for displaying outputs ----
                      mainPanel(
-                         plotOutput(outputId = "SinglePlot"),
-                         textOutput('safeError')
+                         plotOutput(outputId = "SinglePlot")
                      )
                  ),
         ),
@@ -60,17 +55,15 @@ ui <- fluidPage(
                                                 dimnames = list(c("Peter", "Jane", "Paul", "Susan"),
                                                                 c("Optimal", "Typical", "Pessimistic"))),
                                  class = "numeric"
+                     ),
+                     wellPanel(
+                         h4("Stats for Mixed Distribution"),
+                         tableOutput("CombiStats")
                      )
                  ),
                  # Main panel for displaying outputs ----
                  mainPanel(
                      plotOutput(outputId = "MultiPlot"),
-                     #verbatimTextOutput("CombiStats"),
-                     #textOutput(outputId = "CombiAverage"),
-                     #textOutput(outputId = "CombiStdDev"),
-                     #textOutput(outputId = "CombiVar"),
-                     #textOutput(outputId = "CombiSkewness"),
-                     #textOutput(outputId = "CombiKurtosis"),
                      plotOutput(outputId = "CombiPlot")
                  )
              )
@@ -130,9 +123,6 @@ server <- function(input, output) {
     MultiPertValues <- reactive({
         Values <- na.omit( input$TeamMatrix )
         Estimators <- nrow(Values)
-        # shiny::validate(
-        #     need(Estimators > 0, "I need at least one triple of estimates to show something")
-        # )
         if (Estimators == 0)
             return(NULL)
         else
@@ -223,25 +213,24 @@ server <- function(input, output) {
         Values <- MultiPertValues()
         
         shiny::validate(
-            need(Data, "Keine Daten")
+          need(Values > 0, "I need at least one triple of estimates to show something"),
+          need(Data, "No data found")
         )
         
         # plot combined PERT distribution
         p <- ggplot(Data, aes(x = X, y = Y, colour = Group)) +
                     geom_line() +
-                    ggtitle("Estimated Distributions") +
+                    ggtitle("Individual Distributions") +
                     scale_x_continuous(name="Estimate") + 
                     scale_y_continuous(name="Subjective Probability") +
                     theme(legend.position="top") + 
-                    scale_fill_discrete(name="Expert")
-                    #+ geom_label(aes(x = 10, y = max(Y), colour = unique(Group), label = unique(Group)))
+                    scale_colour_discrete(name="Expert")
 
         for (Line in 1:nrow(Values)) {
             Name <- rownames(Values)[Line]
             PosX <- Values[Line, 2] + ((Values[Line, 3] - Values[Line, 1]) * 0.1 )
             PosY <- dpert(Values[Line, 2], min = Values[Line, 1], mode=Values[Line, 2], max=Values[Line, 3])
-            p <- p + annotate("label", x = PosX, y = PosY, label = Name,
-                              alpha = 3/10)
+            p <- p + annotate("label", x = PosX, y = PosY, label = Name, alpha = 3/10)
         }
         
         p
@@ -257,14 +246,14 @@ server <- function(input, output) {
         X <- seq(min(Data$X), max(Data$X), length.out = nrow(Data) / nlevels(Data$Group))
         Y <- rowsum(Data$Y, Data$X) / nlevels(Data$Group)
         Data <- data.frame(X = X, Y = Y) #Y = distr::d(MultiPertFunc())(X))
-        print(sum(Data$Y))
         
-        # Compute 50p integral
-        Avg50p <- quantile(Y, probs = 0.5) #TODO: FALSCH!!! ecdf()
+        # Compute 50% "integral", i.e. quantile
         Avg50p <- Area50P(X, Y)
-        
         # Mean
         AvgMean <- sum(apply(Data, 1, prod)) / sum(Data$Y)
+        # Var
+        Variance <- sum(apply(Data, 1, function(x) (prod(x)/sum(Data$Y))^2)) / AvgMean^2
+        print(Variance)
         
         # plot PERT distribution
         p <- ggplot(Data, aes(x = X, y = Y)) +
@@ -273,9 +262,9 @@ server <- function(input, output) {
             annotate("point", x = max(Values), y = 0, size = 5, colour = "blue", alpha = 1/5) +
             annotate("point", x = Avg50p, y = 0, size = 5, colour = "red", alpha = 1/5) +
             annotate("label", x = Avg50p, y = max(Data$Y)/20, size = 5, colour = "red", alpha = 1/5, label = format(Avg50p, digits = 2L, nsmall = 2L)) +
-            annotate("point", x = AvgMean, y = 0, size = 5, colour = "pink", alpha = 1/5) +
-            annotate("label", x = AvgMean, y = max(Data$Y)/20, size = 5, colour = "pink", alpha = 1/5, label = format(AvgMean, digits = 2L, nsmall = 2L)) +
-            ggtitle("Overall Distribution") +
+            annotate("point", x = AvgMean, y = 0, size = 5, colour = "green", alpha = 1/5) +
+            annotate("label", x = AvgMean, y = max(Data$Y)/20, size = 5, colour = "green", alpha = 1/5, label = format(AvgMean, digits = 2L, nsmall = 2L)) +
+            ggtitle("Mixed Distribution") +
             scale_x_continuous(name="Estimate") + scale_y_continuous(name="Subjective Probability")
         
         return(p)
