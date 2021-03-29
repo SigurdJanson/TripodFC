@@ -324,11 +324,7 @@ Area50P <- function(X, dX) {
 #' @param X 
 #' @param dX Probability densities of X
 #' @param Truncated Does the range cover the whole distribution or only a part of it?
-#'
-#' @return
-#' @export
-#'
-#' @examples
+#' @return Gives the distribution mass derived from the densities.
 .dX2pX <- function(X, dX, Truncated = FALSE) {
   Deltas <- range(diff(X)) # Intervals of X
   #if (diff(Deltas) > .Machine$double.eps/10) stop("Equal steps among X values is required")
@@ -341,11 +337,21 @@ Area50P <- function(X, dX) {
   dX * Deltas
 }
 
-#' @title AvgOfDensities
+
+
+#' Estimate distribution moments from a representation of the densities.
 #' @description Computes the mean of a probability distribution from a series 
 #' of density values.
 #' @inheritParams .dX2pX
-#' @note 
+#' @note The correctness and precision depends on the quality of the data and
+#' the shape of the probability distribution. Large quantile steps cannot lead 
+#' to a precise estimate. Also problematic is the behaviour of the probability
+#' distribution at it's outer edges. Optimal are probability distributions like
+#' the beta Pert distribution which ends on both sides of its range with a density 
+#' of zero. More difficult are distributions that converge to zero with the quantile
+#' approaching infinity (like the normal distribution). Most problematic are 
+#' functions that converge to infinity.
+#' @export
 AvgOfDensities <- function(X, dX, Truncated = FALSE) {
   pX <- .dX2pX(X, dX, Truncated)
   sum(X * pX)
@@ -353,17 +359,12 @@ AvgOfDensities <- function(X, dX, Truncated = FALSE) {
 
 
 
-#' @title VarOfDensities
-#' @description Computes the mean of a probability distribution from a series 
-#' of density values.
-#' @inheritParams .dX2pX
-#' @note 
+#' @describeIn AvgOfDensities Variance of a probability distribution 
+#' @export
 VarOfDensities <- function(X, dX, Truncated = FALSE) {
   pX <- .dX2pX(X, dX, Truncated)
   Avg <- sum(X * pX)
   SumOfSquares <- sum(mapply(function(x, y) (x^2*y), X, pX))
   SumOfSquares - Avg^2
-  #SumOfSquares <- sum(mapply(function(x, y) ((x - Avg)^2*y), X, pX))
-  #SumOfSquares
 }
 
