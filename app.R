@@ -9,7 +9,7 @@ if(!exists("PoolOpinions", mode="function"))
 
 #' Constant to define into how many pieces the distribution will be split. 
 #' The more pieces, the more precision.
-Precision <- 10000
+Precision <- 50000
 
 # Define UI for app that draws a histogram ----
 ui <- fluidPage(
@@ -34,7 +34,11 @@ ui <- fluidPage(
                          sliderInput(inputId = "Pessimistic0",
                                      label = "Pessimistic",
                                      min = 1, max = 200,
-                                     value = 50)
+                                     value = 50),
+                         wellPanel(
+                             h4("Distribution Stats"),
+                             tableOutput("SinglePertStats")
+                         )
                      ), #sidebarPanel
                      
                      # Main panel for displaying outputs ----
@@ -77,7 +81,26 @@ ui <- fluidPage(
 server <- function(input, output) {
     
     # Single PERT distribution ----
-    # with optimistic, typical and pessimistic value
+    
+    # STATS
+    output$SinglePertStats <- renderTable({
+        req(input$Typical0 > input$Optimistic0, 
+            input$Pessimistic0 > input$Typical0)
+        
+        Mean <- (input$Optimistic0 + 4*input$Typical0 + input$Pessimistic0) / 6
+        Median <- (input$Optimistic0 + 6*input$Typical0 + input$Pessimistic0) / 8
+        Var  <- (Mean - input$Optimistic0) * (input$Pessimistic0 - Mean) / 7
+        StdDev <- sqrt(Var)
+        SixthSigma <- (input$Pessimistic0 - input$Optimistic0) / 6
+        
+        data.frame(
+            Parameter = c("Mean", "Median", "Variance", "StdDev", "1/6th sigma"),
+            Value     = c(Mean, Median, Var, StdDev, SixthSigma)
+        )
+    }, spacing = "l")
+    
+    
+    # PLOT
     output$SinglePlot <- renderPlot({
         # PRECONDITIONS
         shiny::validate(
