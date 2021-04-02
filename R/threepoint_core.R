@@ -1,24 +1,89 @@
 #'
 #' Basic app functions for "3-point Estimator" App
 #' 
-#'
 library(distr)
 library(mc2d)
 
 
-#' @details The approach by Davis avoids assumptions regarding 
-Pert.Params <- function(min=-1, mode=0, max=1, shape = 4, method = c("classic", "vose", "davis")) {
-  ## check input
-  if (!exists("min")) stop("'min' is missing")
-  if (!exists("mode")) stop("'mode' is missing")
-  if (!exists("max")) stop("'max' is missing")
-  if (!exists("shape")) stop("'shape' is missing")
-  if (!is.numeric(min)) stop("'min' must be a numeric value")
-  if (!is.numeric(mode)) stop("'mode' must be a numeric value")
-  if (!is.numeric(max)) stop("'max' must be a numeric value")
-  if (!is.numeric(shape)) stop("'shape' must be a numeric value")
+#' Pert2BetaParams
+#' 
+#' Determine the parameters of the beta distribution based on parameters of the 
+#' Pert distribution. 
+#' @param min The optimal estimate and minimum of the Pert distribution (double)
+#' @param mode The most likely estimate and the mode of the Pert distribution (double)
+#' @param max The pessimistic estimate and maximum of the Pert distribution (double)
+#' @param shape The shape argument (double, default = 4)
+#' @param method String indicating the estimation technique. Either 
+#' "classic", "vose" or "davis" (which is the default)
+#' @return A list (with class attribute "betaPERT") containing the elements
+#' alpha, beta, min, mode, max, and method (all doubles except method which 
+#' is a string; see the arguments of this function).
+#' @details 
+#' The Beta-PERT methodology was developed in the context of Program Evaluation 
+#' and Review Technique (PERT). Based on a pessimistic estimate (minimum value), 
+#' a most likely estimate (mode), and an optimistic estimate (maximum value), 
+#' typically derived through expert elicitation, the parameters of a 
+#' Beta distribution can be calculated. The Beta-PERT distribution is used 
+#' in stochastic modeling and risk assessment studies to reflect uncertainty 
+#' regarding specific parameters.
+#' 
+#' Different methods exist in literature for defining the parameters of a 
+#' Beta distribution based on PERT. The two most common methods are included 
+#' in the `Pert2BetaParams` function:
+#' 
+#' Classic: The standard formulas for mean, standard deviation, α and β, are 
+#' as follows:
+#'    mean = (a + k*m + b) / (k + 2)
+#'    sd = (b - a) / (k + 2)
+#'    α = { (mean - a) / (b - a) } * { (mean - a) * (b - mean) / sd^{2} - 1 }
+#'    β = α * (b - mean) / (mean - a)
+#'
+#' The resulting distribution is a 4-parameter Beta distribution: Beta(α, β, a, b).
+#' 
+#' Vose: Vose (2008) describes a different formula for α:
+#'    α = (mean - a) * (2 * m - a - b) / { (m - mean) * (b - a) }
+#' 
+#' Mean and β are calculated using the standard formulas; as for the 
+#' classical PERT, the resulting distribution is a 4-parameter Beta 
+#' distribution: Beta(α, β, a, b).
+#'
+#' Note: If m = mean, α is calculated as 1 + k/2, in accordance with the 
+#' mc2d package (see 'Note').
+#' 
+#' Davis: the approach by Davis avoids unnecessary assumptions regarding mean
+#' and standard deviation but actually makes sure that these assume the 
+#' defined values (see the classic definition above).
+#' 
+#'   α = (2 * (b + 4*mode - 5*a) / (3*(b-a))) * 
+#'       (1 + 4 * ( (mode-a)*(b-mode)/(b-a)^2 ))
+#'   β = α * (5*b-4*mode-a) / (b+4*mode-5*a)
+#' @references 
+#' Davis, R. (2008). Teaching Note - Teaching Project Simulation in Excel 
+#'  Using PERT-BetaDistributions. INFORMS Transactions on Education, 8(3), 
+#'  139–148. https://doi.org/10.1287/ited.1080.0013
+#' 
+#' Malcolm, D.G., Roseboom, .J.H, Clark, C.E. & Fazar, W. (1959). 
+#'  Application of a technique for research and development program evaluation. 
+#'  Oper Res 7(5):646-669.
+#'  
+#' Vose, D. (2008). Risk analysis, a quantitative guide, 2nd edition. 
+#'  Wiley and Sons.
+#' @source This is an extension of the \link[prevalence]{betaPERT} function 
+#' from the prevalence package.
+Pert2BetaParams <- function(min=-1, mode=0, max=1, shape = 4, method = c("classic", "vose", "davis")) {
+  # PRECONDITIONS
+  if (missing(min)) stop("Argument 'min' is missing")
+  if (missing(mode)) stop("Argument 'mode' is missing")
+  if (missing(max)) stop("Argument 'max' is missing")
+  if (missing(shape)) stop("Argument 'shape' is missing")
+  if (!is.numeric(min)) stop("Argument 'min' must be a numeric value")
+  if (!is.numeric(mode)) stop("Argument 'mode' must be a numeric value")
+  if (!is.numeric(max)) stop("Argument 'max' must be a numeric value")
+  if (!is.numeric(shape)) stop("Argument 'shape' must be a numeric value")
+  if (min > mode || mode > max) 
+    stop("The order of argument values must be 'min' < 'mode' < 'max'")
   
-  if (!exists("method")) stop("'method' is missing")
+  if (missing("method")) method <- "davis"
   method <- match.arg(method)
   
   if (method == "classic") {
@@ -35,11 +100,13 @@ Pert.Params <- function(min=-1, mode=0, max=1, shape = 4, method = c("classic", 
                     ((mu - min) * (2 * mode - min - max)) / ((mode - mu) * (max - min))) #ok
     beta <- alpha * (max - mu) / (mu - min)
   }
+
   if (method == "davis") {
     alpha <- (2 * (max + 4*mode - 5*min) / (3*(max-min))) *
       (1 + 4 * ( (mode-min)*(max-mode)/(max-min)^2 ))
     beta <- alpha * (5*max-4*mode-min) / (max+4*mode-5*min)
   }
+
   if(is.null(alpha)) stop("Method not available")
     
   out <- list(alpha = alpha, beta = beta,
@@ -51,7 +118,9 @@ Pert.Params <- function(min=-1, mode=0, max=1, shape = 4, method = c("classic", 
 }
 
 
+
 #' betaPERT
+#' 
 #' Parametrize a generalized Beta distribution
 #' @param min Pessimistic estimate (Minimum value)
 #' @param mode Most likely estimate (Mode)
@@ -95,6 +164,8 @@ betaPERT <- function(min=-1, mode=0, max=1, shape = 4, method = c("classic", "vo
     
     return(out)
   }
+
+
 
 #' #' dpert
 #' #' @description Density function for the PERT (aka Beta PERT) distribution with minimum 
@@ -293,6 +364,7 @@ PoolOpinions <- function( Values, Weights = rep(1/nrow(Values), nrow(Values)),
 #' (\code{dX = f(X)} with \code{f} being an arbitrary density function).
 #' @return The value of \code{X} at which the integral of the probability distribution 
 #' exceeds 50% of it's area.
+#' @note Precision mostly depends on the step size (X[n+1]-X[n]).
 Area50P <- function(X, dX) {
   if(length(X) != length(dX)) stop("X and Values must have the same length")
   if(length(X) == 1) {
@@ -352,6 +424,7 @@ Area50P <- function(X, dX) {
 #' approaching infinity (like the normal distribution). Most problematic are 
 #' functions that converge to infinity.
 #' @export
+#' @note Precision mostly depends on the step size (X[n+1]-X[n]).
 AvgOfDensities <- function(X, dX, Truncated = FALSE) {
   pX <- .dX2pX(X, dX, Truncated)
   sum(X * pX)
@@ -361,6 +434,7 @@ AvgOfDensities <- function(X, dX, Truncated = FALSE) {
 
 #' @describeIn AvgOfDensities Variance of a probability distribution 
 #' @export
+#' @note Precision mostly depends on the step size (X[n+1]-X[n]).
 VarOfDensities <- function(X, dX, Truncated = FALSE) {
   pX <- .dX2pX(X, dX, Truncated)
   Avg <- sum(X * pX)
