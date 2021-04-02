@@ -12,11 +12,12 @@ library(mc2d)
 #' @param min The optimal estimate and minimum of the Pert distribution (double)
 #' @param mode The most likely estimate and the mode of the Pert distribution (double)
 #' @param max The pessimistic estimate and maximum of the Pert distribution (double)
-#' @param shape The shape argument (double, default = 4)
+#' @param shape The shape argument (double, default = 4). Ignored for 
+#' the `davis` method.
 #' @param method String indicating the estimation technique. Either 
 #' "classic", "vose" or "davis" (which is the default)
 #' @return A list (with class attribute "betaPERT") containing the elements
-#' alpha, beta, min, mode, max, and method (all doubles except method which 
+#' alpha, beta, min, mode, max, shape, and method (all doubles except method which 
 #' is a string; see the arguments of this function).
 #' @details 
 #' The Beta-PERT methodology was developed in the context of Program Evaluation 
@@ -72,10 +73,6 @@ library(mc2d)
 #' from the prevalence package.
 Pert2BetaParams <- function(min=-1, mode=0, max=1, shape = 4, method = c("classic", "vose", "davis")) {
   # PRECONDITIONS
-  if (missing(min)) stop("Argument 'min' is missing")
-  if (missing(mode)) stop("Argument 'mode' is missing")
-  if (missing(max)) stop("Argument 'max' is missing")
-  if (missing(shape)) stop("Argument 'shape' is missing")
   if (!is.numeric(min)) stop("Argument 'min' must be a numeric value")
   if (!is.numeric(mode)) stop("Argument 'mode' must be a numeric value")
   if (!is.numeric(max)) stop("Argument 'max' must be a numeric value")
@@ -83,13 +80,13 @@ Pert2BetaParams <- function(min=-1, mode=0, max=1, shape = 4, method = c("classi
   if (min > mode || mode > max) 
     stop("The order of argument values must be 'min' < 'mode' < 'max'")
   
-  if (missing("method")) method <- "davis"
+  if (missing(method)) method <- "davis"
   method <- match.arg(method)
   
   if (method == "classic") {
     mu <- (min + shape * mode + max) / (shape + 2)
     sdev <- (max - min) / (shape + 2)
-    alpha <- ((mu - min) / (max - min)) * ( ((mu - min) * (max - mu) / (sdev^ 2 )) - 1 )
+    alpha <- ((mu - min) / (max - min)) * ( ((mu - min) * (max - mu) / (sdev^2 )) - 1 )
     beta <- alpha * (max - mu) / (mu - min)
   }
   
@@ -104,18 +101,21 @@ Pert2BetaParams <- function(min=-1, mode=0, max=1, shape = 4, method = c("classi
   if (method == "davis") {
     alpha <- (2 * (max + 4*mode - 5*min) / (3*(max-min))) *
       (1 + 4 * ( (mode-min)*(max-mode)/(max-min)^2 ))
-    beta <- alpha * (5*max-4*mode-min) / (max+4*mode-5*min)
+    #beta <- alpha * (5*max-4*mode-min) / (max+4*mode-5*min)
+    beta <- (2*(5*max-4*mode-min)/3/(max-min)) * 
+      (1 + 4 * ((mode-min)*(max-mode)/(max-min)^2))
   }
 
   if(is.null(alpha)) stop("Method not available")
     
   out <- list(alpha = alpha, beta = beta,
-              min = min, mode = mode, max = max,
+              min = min, mode = mode, max = max, shape = shape,
               method = method)
   class(out) <- "betaPERT"
   
   return(out)
 }
+
 
 
 
