@@ -82,3 +82,20 @@ test_that("Area50P: Example by Vose 1", {
   expect_equal(169.2857, Threshold50)
   
 })
+
+
+test_that("Compare with qpert", {
+  MaxWidth <- 100
+  StepSize <- 0.0001
+  
+  for (i in 1:10) {
+    a <- runif(1, 0, MaxWidth)
+    c <- a + runif(1, 0, MaxWidth)
+    b <- runif(1, a, c)
+    expect <- qpert(0.5, a, b, c)
+    X <- seq(a, c, StepSize)
+    Data <- dpert(X, a, b, c)
+    obs <- expect_silent( Area50P(X, Data) )
+    expect_equal(obs, expect, tolerance = StepSize)
+  }
+})
