@@ -14,62 +14,62 @@ knitr::opts_chunk$set(echo = TRUE)
 source("../R/threepoint_core.R")
 ```
 
-
+A Pert distribution with a range from $a$ to $c$ and a mode of $b$.
 
 ## Mean
 
 Every source says that the mean of the Pert distribution was:
 
-$$ {\displaystyle \operatorname {E} [X]={\frac {a+4b+c}{6}}=\mu } $$
+$$ \operatorname {E} [X]={\frac {a+4b+c}{6}}=\mu $$
 
 Strangely, this is also the same equation of the [double triangular distribution](http://www.mhnederlof.nl/doubletriangular.html). However, I couldn't find any reason for that and it seems like a coincidence.
 
-Looking closer at the mathematics it becomes clear that the Pert distribution cannot guarantee the specified mean. It is a special case of the beta distribution. The general formula for the mean of the $beta(\alpha, \beta, min, max)$ distributions is ([Wikipedia](https://en.wikipedia.org/wiki/Beta_distribution#Four_parameters)):
+Looking closer at the mathematics it becomes clear that the Pert distribution cannot guarantee the specified mean. It is a special case of the beta distribution. The general formula for the mean of the $beta(\alpha, \beta, a, c)$ distributions is [@enwiki1011418887; @Treat1983]:
 
 $$
-\frac\alpha{\alpha+\beta} \cdot (c-a) = \frac{\alpha c + \beta a}{\alpha+\beta}
+\mu = \frac\alpha{\alpha+\beta} \cdot (c-a) + a = \frac{\alpha c + \beta a}{\alpha+\beta}
 $$
 
-????$$\frac{2 \alpha^{\alpha} \beta^{\beta}}{B(\alpha,\beta)(\alpha + \beta)^{\alpha + \beta + 1}}(max-min)$$????
+So, it is clear that it is not at all determined by the max/min parameters. It is also influenced by two parameters α and β. For a long time these have defined as
 
-So, it is clear that it is not at all limited to the max/min parameters. It is also defined by two parameters α and β. For a long time these have defined as
-
-$$ \alpha = {(\mu - min) * (2 \cdot mode-min-max)\over (mode-\mu)*(max - min)} $$
+$$ \alpha = {(\mu - a) (2 \cdot b-a-c)\over (b-\mu) (c - a)} $$
 
 and
 
-$$ \beta = \alpha \cdot {(max - \mu) \over (\mu - min)} $$
+$$ \beta = \alpha \cdot {(c - \mu) \over (\mu - a)} $$
 
 
 If we solve these equations for a simple example it becomes clear that there is a discrepancy. 
 
 ```{r}
 min <- 1
-mode <- 3
+mode <- 1.2
 max <- 10
 shape <- 4
 
 # Compute approximate value
 mu <- (min + shape * mode + max)/(shape + 2)
+stdev <- (max-min) / 6
 
 Params <- Pert2BetaParams(min, mode, max, shape, "classic")
 
 # "true" mean
 tMean <- Params$alpha / (Params$alpha+Params$beta) * (max-min) + min
+tVar  <-  (max-min)^2 * Params$alpha * Params$beta / (Params$alpha+Params$beta)^2 / (Params$alpha+Params$beta+1)
 
 print(Params$method)
-data.frame(Arg = c("alpha", "beta", "Pert mean", "Beta mean", "Delta"),
-           Val = c(Params$alpha, Params$beta, mu, tMean, mu - tMean))
+data.frame(Arg = c("alpha", "beta", "Pert mean", "Beta mean", "Delta", "Pert Variance", "Beta Variance"),
+           Val = c(Params$alpha, Params$beta, mu, tMean, mu - tMean, stdev^2, tVar))
 ```
 
 @Davis2008 addresses this inconsistency. He proposes a new way to estimate the α and β parameters of the beta distribution to make sure that mean and standard deviation are fixed to the defined values.
 
-$$   \alpha = \frac{2 \cdot (b + 4mode - 5a)} {3(b-a)} \cdot 
-       \left[ 1 + 4 \cdot \frac{(mode-a)\cdot(b-mode)}{(b-a)^2} \right] $$
+$$   \alpha = \frac{2 \cdot (c + 4b - 5a)} {3(c-a)} \cdot 
+       \left[ 1 + 4 \cdot \frac{(b-a)\cdot(c-b)}{(c-a)^2} \right] $$
 
-$$   \beta = \alpha \cdot \frac{5b-4mode-a}{b+4mode-5a} $$
+$$   \beta = \alpha \cdot \frac{5c-4b-a}{c+4b-5a} $$
 
-If we make the same test with the noew equations we get:
+If we make the same test with the new equations we get:
 
 ```{r}
 # min <- 1
@@ -84,10 +84,11 @@ Params <- Pert2BetaParams(min, mode, max, shape, "davis")
 
 # "true" mean
 tMean <- Params$alpha / (Params$alpha+Params$beta) * (max-min) + min
+tVar  <-  (max-min)^2 * Params$alpha * Params$beta / (Params$alpha+Params$beta)^2 / (Params$alpha+Params$beta+1)
 
 print(Params$method)
-data.frame(Arg = c("alpha", "beta", "Pert mean", "Beta mean", "Delta"),
-           Val = c(Params$alpha, Params$beta, mu, tMean, mu - tMean))
+data.frame(Arg = c("alpha", "beta", "Pert mean", "Beta mean", "Delta", "Pert Variance", "Beta Variance"),
+           Val = c(Params$alpha, Params$beta, mu, tMean, mu - tMean, stdev^2, tVar))
 ```
 
 
@@ -98,16 +99,16 @@ The standard deviation of the Pert distribution is known as one sixth of it's to
 
 $$ \sigma = {c - a \over 6} = \frac{1}{6}(c - a)$$
 
-However, that is an approximation. The exact formula for the variance is 
+However, that is an approximation. The exact formula for the variance is [@enwiki1001556353]
 
 $$
-\sigma^2 = \frac{(m-a)(c-m)}{7}
+\sigma^2 = \frac{(\mu-a)(c-\mu)}{7}
 $$
 
 or in terms of the beta distribution:
 
- $$ \text{var}(X)(max-min)^2 = 
-    \frac{\alpha\beta (max-min)^2} {(\alpha+\beta)^2(\alpha+\beta+1)} $$
+ $$ \text{var}(X)(c-a)^2 = 
+    \frac{\alpha\beta (c-a)^2} {(\alpha+\beta)^2(\alpha+\beta+1)} $$
 
 
 Given the above formula of the Pert mean and the fact that the standard deviation is the square root of the variance this is the exact formula.
@@ -135,29 +136,47 @@ ggplot(data, aes(x = b, y = sigma)) + geom_line()
 
 As we can see the standard deviation depends on the most likely estimate $b$. It ranges around 1/6 = `r format(1/6, digits=2, nsmall = 3)` from `r format(min(sigma), digits=2, nsmall = 3)` to `r format(max(sigma), digits=2, nsmall = 3)`. Such variations are why @Farnum1987 warned about using the approximation in extreme cases when the most-likely estimate is close to the minimum or maximum, i. e. close than 13% of the total range.
 
-Again @Davis2008 handles the inconsistency. All in all, it is probably better to avoid the `pert` distributiuon family of the [mc2d](https://rdrr.io/cran/mc2d/) (@Pouillot2010a) package. Instead, compute α and β using the equations from @Davis2008 and use the generalised [beta distribution (betagen)](https://rdrr.io/cran/mc2d/man/betagen.html) instead.
+Again @Davis2008 handles the inconsistency. All in all, it is probably better to avoid the `pert` distribution family of the [mc2d](https://rdrr.io/cran/mc2d/) [@Pouillot2010a] package. Instead, compute α and β using the equations from @Davis2008 and use the generalized [beta distribution (betagen)](https://rdrr.io/cran/mc2d/man/betagen.html) instead.
+
+
 
 
 ## Median
 
-A rough estimate of the median is 
+A rough estimate of the median is [@enwiki1011418887]
 
 $$ Median = \frac{(a + 6*b + c)}{8} $$
 
 The actual definition of the median is 
 
-$$ {\displaystyle I_{\frac {1}{2}}^{[-1]}(\alpha ,\beta )(c-a)+a} $$
+$$ I_{\frac {1}{2}}^{[-1]}(\alpha, \beta ) (c-a) + a $$
 for which the regularized incomplete beta function 
 
-$$ {\displaystyle I_{x}(\alpha ,\beta )={\tfrac {1}{2}}}I_x(\alpha,\beta) = \tfrac{1}{2}$$. 
+$$ {\displaystyle I_{x}(\alpha,\beta )={\tfrac {1}{2}}}I_x(\alpha,\beta) = \tfrac{1}{2}$$. 
 
 However, there is no general closed-form expression for the median of the beta distribution for arbitrary values of α and β. Yet, it can easily be done in R with `qpert(0.5, min=a, mode=b, max=c)` (using the mc2d package) or with `qbeta(0.5, alpha, beta) * (c - a) + a`.
+
+
+
 
 
 # Parametrization of the Beta distributions
 
 ## Classic
 
+According to @Pouillot2010a this equation is from @Malcolm1959 but I was unable to find it there. Lacking a better source this is from @Pouillot2010a :
+
+$$
+\begin{align}
+    \mu &= \frac{a + shape * b + c} {shape + 2} \\
+    \sigma &= \frac{c - a}{shape + 2} \\
+    \alpha &= \frac{\mu - a}{c - a} \cdot \left( \frac{(\mu - a) * (c - \mu)}{\sigma^2} - 1 \right)  \\ 
+           &= \frac{\mu - a}{c - a} \cdot \left( \frac{(\mu - a) * (c - \mu) (shape + 2)^2}{(c - a)^2} - 1 \right)     \\
+           &= \frac{shape (a - c + a shape - b shape) ((a - c)^2 + (a - b) (b - c) shape)} {(a - c)^3 (2 + shape)}     \\
+           
+    \beta &= \alpha * \frac{c - \mu}{\mu - a}
+\end{align}
+$$
 
 
 ## Vose
@@ -186,6 +205,41 @@ $$
             \left[ 1+4(\frac{(b-a)(c-b)}{(c-a)^2}) \right]
 \end{aligned}
 $$
+
+
+
+
+# The Four Parameter Beta Distributions
+
+Pert is based on the Beta distribution. While the standard definition of the beta distribution has a range of $[0, 1]$ a re-parametrized version with four parameters allows setting a range $[a, c]$, too. 
+
+Mean [@enwiki1011418887; @Treat1983]
+
+$$
+\mu_1 = \frac{\alpha}{\alpha+\beta} (c - a) + a
+$$
+
+Variance [@Treat1983]
+
+$$
+\mu_2 = \frac{(c-a)^2 \alpha\beta}{(\alpha+\beta)^2 (\alpha+\beta+1)}
+$$
+
+"Since the skewness and excess kurtosis are non-dimensional quantities (as moments centered on the mean and normalized by the standard deviation), they are independent of the parameters a and c" [@enwiki1011418887]
+
+Skewness [@Treat1983]
+$$
+\mu_3 = \frac{2 (\beta-\alpha) \sqrt{\alpha+\beta+1}}{(\alpha+\beta+2)\sqrt{\alpha\beta}}
+$$
+
+Kurtosis [equations taken from @Treat1983; and @enwiki1011418887, but it is unclear if they are equivalent].
+
+$$
+\mu_4 = \frac{3 (\alpha+\beta+1) [2(\alpha+\beta)^2 + \alpha\beta (\alpha+\beta-6)]} {\alpha\beta (\alpha+\beta+2) (\alpha+\beta+3)} 
+= \frac{6[(\alpha - \beta)^2 (\alpha +\beta + 1) - \alpha \beta (\alpha + \beta + 2)]}
+{\alpha \beta (\alpha + \beta + 2) (\alpha + \beta + 3)} 
+$$
+
 
 
 # References
