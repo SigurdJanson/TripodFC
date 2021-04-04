@@ -1,8 +1,8 @@
 #' Shiny App to do PERT 3-point estimates
 #' 
 #' 
-library("shiny")
-library("shinyMatrix")
+library(shiny)
+library(shinyMatrix)
 library(ggplot2)
 if(!exists("PoolOpinions", mode="function")) 
     source("threepoint_core.R")
@@ -14,7 +14,7 @@ Precision <- 50000
 # Define UI for app that draws a histogram ----
 ui <- fluidPage(
     # App title ----
-    titlePanel("Three-Point Estimation"),
+    titlePanel("Tripod FC"),
     
     tabsetPanel(
         id = "tabs",
@@ -88,7 +88,11 @@ server <- function(input, output) {
             input$Pessimistic0 > input$Typical0)
         
         Mean <- (input$Optimistic0 + 4*input$Typical0 + input$Pessimistic0) / 6
-        Median <- (input$Optimistic0 + 6*input$Typical0 + input$Pessimistic0) / 8
+        # Median
+        Median <- qpert(0.5, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
+            #qbeta(0.5, alpha, beta) * 
+            #(input$Pessimistic0 - input$Optimistic0) + input$Optimistic0
+        # Median = (input$Optimistic0 + 6*input$Typical0 + input$Pessimistic0) / 8
         Var  <- (Mean - input$Optimistic0) * (input$Pessimistic0 - Mean) / 7
         StdDev <- sqrt(Var)
         SixthSigma <- (input$Pessimistic0 - input$Optimistic0) / 6
@@ -97,7 +101,7 @@ server <- function(input, output) {
             Parameter = c("Mean", "Median", "Variance", "StdDev", "1/6th sigma"),
             Value     = c(Mean, Median, Var, StdDev, SixthSigma)
         )
-    }, spacing = "l")
+    })
     
     
     # PLOT
@@ -172,60 +176,78 @@ server <- function(input, output) {
     })
         
         
-    # Generate the combined probability distributions required for the Team tab 
-    MultiPertFunc <- reactive({
-        Values <- req(MultiPertValues())
-        # Values on x axis
-        #X <- seq(min(Values), max(Values), length.out = Precision)
+    # # Generate the combined probability distributions required for the Team tab 
+    # MultiPertFunc <- reactive({
+    #     Values <- req(MultiPertValues())
+    #     # Values on x axis
+    #     #X <- seq(min(Values), max(Values), length.out = Precision)
+    #     
+    #     
+    #     # Compute all PERT functions
+    #     Data = list()
+    #     for(Line in 1:nrow(Values)) {
+    #         dfunc <- function(x, log = FALSE) 
+    #             dpert(x = x, min  = Values[Line, "Optimal"], 
+    #                   mode = Values[Line, "Typical"], 
+    #                   max  = Values[Line, "Pessimistic"], 
+    #                   log = log)
+    #         pfunc <- function(q, lower.tail = TRUE, log.p = FALSE) 
+    #             ppert(q = q, min  = Values[Line, "Optimal"], 
+    #                   mode = Values[Line, "Typical"], 
+    #                   max  = Values[Line, "Pessimistic"], 
+    #                   lower.tail = lower.tail, log.p = log.p)
+    #         qfunc <- function(p, lower.tail = TRUE, log.p = FALSE) 
+    #             qpert(p = p, min  = Values[Line, "Optimal"],
+    #                   mode = Values[Line, "Typical"],
+    #                   max  = Values[Line, "Pessimistic"],
+    #                   lower.tail = lower.tail, log.p = log.p)
+    #         rfunc <- function(n) 
+    #             rpert(n = n, min  = Values[Line, "Optimal"], 
+    #                   mode = Values[Line, "Typical"], 
+    #                   max  = Values[Line, "Pessimistic"])
+    #         Data[[Line]] <- AbscontDistribution(d = dfunc, 
+    #                                             p = pfunc,
+    #                                             q = qfunc,
+    #                                             r = rfunc,
+    #                                             withgaps = FALSE)#, withStand = TRUE)
+    #     }
+    #     names(Data) <- rownames(Values)
+    #     
+    #     # 
+    #     # PooledData <- PoolOpinions(Data, Weights = Weight)
+    #     MixedDistr <- UnivarMixingDistribution(Dlist = Data)#new("DistrList", Data))
+    #     #plot(MixedDistr)
+    #     
+    #     # Add 50% threshold of pooled distribution
+    #     #Threshold50 <- Area50P(X, PooledData)
+    #     
+    #     # list(
+    #     #     Estimates = Values,
+    #     #     PertData = Data,
+    #     #     PooledPertData = PooledData,
+    #     #     Threshold50 = Threshold50,
+    #     #     XValues = X,         # x axis
+    #     #     Weights = Weight
+    #     # )
+    #     return(MixedDistr)
+    # })
+    
+    
+    output$MultiPertStats <- renderTable({
+        Mean <- AvgOfDensities()
+        # Median
+        Median <- qpert(0.5, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
+        #qbeta(0.5, alpha, beta) * 
+        #(input$Pessimistic0 - input$Optimistic0) + input$Optimistic0
+        # Median = (input$Optimistic0 + 6*input$Typical0 + input$Pessimistic0) / 8
+        Var  <- (Mean - input$Optimistic0) * (input$Pessimistic0 - Mean) / 7
+        StdDev <- sqrt(Var)
+        SixthSigma <- (input$Pessimistic0 - input$Optimistic0) / 6
         
-        
-        # Compute all PERT functions
-        Data = list()
-        for(Line in 1:nrow(Values)) {
-            dfunc <- function(x, log = FALSE) 
-                dpert(x = x, min  = Values[Line, "Optimal"], 
-                      mode = Values[Line, "Typical"], 
-                      max  = Values[Line, "Pessimistic"], 
-                      log = log)
-            pfunc <- function(q, lower.tail = TRUE, log.p = FALSE) 
-                ppert(q = q, min  = Values[Line, "Optimal"], 
-                      mode = Values[Line, "Typical"], 
-                      max  = Values[Line, "Pessimistic"], 
-                      lower.tail = lower.tail, log.p = log.p)
-            qfunc <- function(p, lower.tail = TRUE, log.p = FALSE) 
-                qpert(p = p, min  = Values[Line, "Optimal"],
-                      mode = Values[Line, "Typical"],
-                      max  = Values[Line, "Pessimistic"],
-                      lower.tail = lower.tail, log.p = log.p)
-            rfunc <- function(n) 
-                rpert(n = n, min  = Values[Line, "Optimal"], 
-                      mode = Values[Line, "Typical"], 
-                      max  = Values[Line, "Pessimistic"])
-            Data[[Line]] <- AbscontDistribution(d = dfunc, 
-                                                p = pfunc,
-                                                q = qfunc,
-                                                r = rfunc,
-                                                withgaps = FALSE)#, withStand = TRUE)
-        }
-        names(Data) <- rownames(Values)
-        
-        # 
-        # PooledData <- PoolOpinions(Data, Weights = Weight)
-        MixedDistr <- UnivarMixingDistribution(Dlist = Data)#new("DistrList", Data))
-        #plot(MixedDistr)
-        
-        # Add 50% threshold of pooled distribution
-        #Threshold50 <- Area50P(X, PooledData)
-        
-        # list(
-        #     Estimates = Values,
-        #     PertData = Data,
-        #     PooledPertData = PooledData,
-        #     Threshold50 = Threshold50,
-        #     XValues = X,         # x axis
-        #     Weights = Weight
-        # )
-        return(MixedDistr)
+        data.frame(
+            Parameter = c("Mean", "Median", "Variance", "StdDev", "1/6th sigma"),
+            Value     = c(Mean, Median, Var, StdDev, SixthSigma)
+        )
     })
     
     
