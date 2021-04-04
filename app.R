@@ -62,7 +62,7 @@ ui <- fluidPage(
                      ),
                      wellPanel(
                          h4("Stats for Mixed Distribution"),
-                         tableOutput("CombiStats")
+                         tableOutput("CombiPertStats")
                      )
                  ),
                  # Main panel for displaying outputs ----
@@ -158,6 +158,7 @@ server <- function(input, output) {
     
     
     # Team Data Set ----
+    
     # Generate the data set required for the Team tab 
     MultiPertData <- reactive({
         Values <- req(MultiPertValues())
@@ -173,6 +174,16 @@ server <- function(input, output) {
         }
         Data$Group <- factor(Data$Group)
         return(Data)
+    })
+    
+    CombinedPertData <- reactive({
+        Values <- MultiPertValues()
+        Data   <- MultiPertData()
+        X <- seq(min(Data$X), max(Data$X), length.out = nrow(Data) / nlevels(Data$Group))
+        Y <- rowsum(Data$Y, Data$X) / nlevels(Data$Group)
+        Data <- data.frame(X = X, Y = Y) 
+        
+        Data
     })
         
         
@@ -233,16 +244,14 @@ server <- function(input, output) {
     # })
     
     
-    output$MultiPertStats <- renderTable({
-        Mean <- AvgOfDensities()
-        # Median
-        Median <- qpert(0.5, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
-        #qbeta(0.5, alpha, beta) * 
-        #(input$Pessimistic0 - input$Optimistic0) + input$Optimistic0
-        # Median = (input$Optimistic0 + 6*input$Typical0 + input$Pessimistic0) / 8
-        Var  <- (Mean - input$Optimistic0) * (input$Pessimistic0 - Mean) / 7
+    output$CombiPertStats <- renderTable({
+        Data <- CombinedPertData()
+
+        Mean   <- AvgOfDensities(Data$X, Data$Y)
+        Median <- Area50P(Data$X, Data$Y)
+        Var    <- VarOfDensities(Data$X, Data$Y)
         StdDev <- sqrt(Var)
-        SixthSigma <- (input$Pessimistic0 - input$Optimistic0) / 6
+        SixthSigma <- (max(Data$X) - min(Data$X)) / 6
         
         data.frame(
             Parameter = c("Mean", "Median", "Variance", "StdDev", "1/6th sigma"),
