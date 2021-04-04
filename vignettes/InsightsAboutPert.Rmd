@@ -96,9 +96,10 @@ How can these discrepancy be addressed? I found three approaches in the literatu
  1. Find new equations that give the correct (or a more correct) mean and standard deviation [e.g. @Lau1998; @GolenkoGinzburg1988; summarized and challenged by @Perez2017].
  1. Yet others investigate the relation between mean/standard deviation and the shape parameter of the Pert distribution [see @Pleguezuelo2003].
 
-If we solve these equations for a simple example it becomes clear that there is a discrepancy. 
 
-```{r}
+Would it not be interesting if we could really make a fixed standard deviation possible? If we solve the equations for a simple example it becomes clear that there is a discrepancy. The plot shows the variances (y-axis) depending on mode (x-axis), and the parametrization method (colour). The variances of Davis and Vose have been moved a little bit to the right because it would not be possible to dinstinguish those from other equations.
+
+```{r echo=FALSE}
 library(ggplot2)
 min <- -1
 max <- +1
@@ -107,40 +108,63 @@ shape <- 4
 mode <- seq(min, max, 0.05)
 
 # Compute approximate value
-mu <- (min + shape * mode + max)/(shape + 2)
-stdev <- (max-min) / 6
+#mu <- (min + shape * mode + max)/(shape + 2)
+#stdev <- (max-min) / 6
 
+Data <- data.frame(Mode = numeric(), 
+                   Mean = numeric(), 
+                   Var = numeric(), 
+                   Method = character())
+Jitter  <- c(classic = -0.02, golgin = -0.04, vose = 0.03, davis = 0.04, Theoretical = 0.00)
 
-# Vose: "true" mean
-Params <- Pert2BetaParams(min, mode, max, shape, "vose")
-tMean  <- Params$alpha / (Params$alpha+Params$beta) * (max-min) + min
-tVar   <-  (max-min)^2 * Params$alpha * Params$beta / (Params$alpha+Params$beta)^2 / (Params$alpha+Params$beta+1)
+# Compute using different paramtrization methods
+for (m in c("classic", "golgin", "vose", "davis")) {
+  Params <- Pert2BetaParams(min, mode, max, shape, m)
+  tMean  <- Params$alpha / (Params$alpha+Params$beta) * (max-min) + min
+  tVar   <- (max-min)^2 * Params$alpha * Params$beta / 
+            (Params$alpha+Params$beta)^2 / (Params$alpha+Params$beta+1)
+  Data <- rbind(Data, data.frame(Mode = mode + Jitter[m], 
+                                 Mean = tMean, 
+                                 Var  = tVar, 
+                                 Method = rep(m, length(mode))))
+}
 
-# Davis: "true" mean
-Params <- Pert2BetaParams(min, mode, max, shape, "davis")
-tMean  <- Params$alpha / (Params$alpha+Params$beta) * (max-min) + min
-tVar   <-  (max-min)^2 * Params$alpha * Params$beta / (Params$alpha+Params$beta)^2 / (Params$alpha+Params$beta+1)
+# Add theoretical values
+Data <- rbind(Data, data.frame(Mode = mode + Jitter[m], 
+                               Mean = (min + shape * mode + max)/(shape + 2), 
+                               Var  = (max-min)^2 / 36, 
+                               Method = rep("Theoretical", length(mode))))
 
-#print(Params$method)
-# data.frame(Arg = c("alpha", "beta", "Pert mean", "Beta mean", "Delta", "Pert Variance", "Beta Variance"),
-#            BetaParam = c(Params$alpha, Params$beta),
-#            Defined = c(mu, stdev^2),
-#            Vose    = c(tMean, tVar),
-#            Davis   = c())
+# Plot
+ggplot(Data, aes(x = Mode, y = Var, colour = Method)) +
+  geom_line(size = 3/4) + theme_linedraw() + 
+  scale_color_manual(values = c("sienna1", "tan4", "hotpink1", "black", "darkmagenta")) + 
+  labs(x = "Var", y = "Mode")
 ```
 
-@Davis2008 addresses this inconsistency. He proposes a new way to estimate the α and β parameters of the beta distribution to make sure that mean and standard deviation are fixed to the defined values.
+As we can see the parametrization @Davis2008 works. He proposes a new way to estimate the α and β parameters of the beta distribution to make sure that mean and standard deviation are fixed to the defined values:
 
 $$   \alpha = \frac{2 \cdot (c + 4b - 5a)} {3(c-a)} \cdot 
        \left[ 1 + 4 \cdot \frac{(b-a)\cdot(c-b)}{(c-a)^2} \right] $$
 
 $$   \beta = \alpha \cdot \frac{5c-4b-a}{c+4b-5a} $$
 
+What is most interesting and baffling is the observation that the classic parametrization of the beta distribution shows the exact same pattern, i.e. no deviation from a fixed variance of 1/36.
+
+```{r}
+Jitter  <- c(classic = -0.02, golgin = 0.02, vose = 0.04, davis = 0.06, Theoretical = 0.00)
+ggplot(Data, aes(x = Mode, y = Mean, colour = Method)) +
+  geom_line(size = 3/4) + theme_linedraw() + 
+  scale_color_manual(values = c("sienna1", "tan4", "hotpink1", "black", "darkmagenta")) + 
+  labs(x = "Mean", y = "Mode")
+```
+
+
+A similar experiment with distribution means shows no deviation from the mean. Regardless of the parametrization method 
 
 
 
-
-Again @Davis2008 handles the inconsistency. All in all, it is probably better to avoid the `pert` distribution family of the [mc2d](https://rdrr.io/cran/mc2d/) [@Pouillot2010a] package. Instead, compute α and β using the equations from @Davis2008 and use the generalized [beta distribution (betagen)](https://rdrr.io/cran/mc2d/man/betagen.html) instead.
+All in all, @Davis2008 handles the inconsistency. It is probably better to avoid the `pert` distribution family of the [mc2d](https://rdrr.io/cran/mc2d/) [@Pouillot2010a] package. Instead, compute α and β using the equations from @Davis2008 and use the generalized [beta distribution (betagen)](https://rdrr.io/cran/mc2d/man/betagen.html) instead.
 
 
 
@@ -268,7 +292,7 @@ Or maybe all this tells another story. Maybe @Malcolm1959 got it right in the fi
 
 The authors are obviously fully aware of the fact that the beta distribution is still ambiguous unless further assumptions are made. So, @Clark1962 continues:
 
-> Suppose we select one-sixth of the range as the standard deviation (the normal distribution truncated at +-2.66) has its standard deviation 1/6 fo the range, and we feel that this truncated normal distribution is an appropriate simple model for specifying the ratio of the standard deviation to the range). 
+> Suppose we select one-sixth of the range as the standard deviation (the normal distribution truncated at ±2.66) has its standard deviation 1/6 fo the range, and we feel that this truncated normal distribution is an appropriate simple model for specifying the ratio of the standard deviation to the range). 
 
 Which could be the assumption capable of defining the Pert beta distribution. And - indeed - @Clark1962 finishes:
 
