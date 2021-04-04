@@ -157,8 +157,7 @@ server <- function(input, output) {
     })
     
     
-    # Team Data Set ----
-    
+    # Team Distributions ----
     # Generate the data set required for the Team tab 
     MultiPertData <- reactive({
         Values <- req(MultiPertValues())
@@ -176,91 +175,6 @@ server <- function(input, output) {
         return(Data)
     })
     
-    CombinedPertData <- reactive({
-        Values <- MultiPertValues()
-        Data   <- MultiPertData()
-        X <- seq(min(Data$X), max(Data$X), length.out = nrow(Data) / nlevels(Data$Group))
-        Y <- rowsum(Data$Y, Data$X) / nlevels(Data$Group)
-        Data <- data.frame(X = X, Y = Y) 
-        
-        Data
-    })
-        
-        
-    # # Generate the combined probability distributions required for the Team tab 
-    # MultiPertFunc <- reactive({
-    #     Values <- req(MultiPertValues())
-    #     # Values on x axis
-    #     #X <- seq(min(Values), max(Values), length.out = Precision)
-    #     
-    #     
-    #     # Compute all PERT functions
-    #     Data = list()
-    #     for(Line in 1:nrow(Values)) {
-    #         dfunc <- function(x, log = FALSE) 
-    #             dpert(x = x, min  = Values[Line, "Optimal"], 
-    #                   mode = Values[Line, "Typical"], 
-    #                   max  = Values[Line, "Pessimistic"], 
-    #                   log = log)
-    #         pfunc <- function(q, lower.tail = TRUE, log.p = FALSE) 
-    #             ppert(q = q, min  = Values[Line, "Optimal"], 
-    #                   mode = Values[Line, "Typical"], 
-    #                   max  = Values[Line, "Pessimistic"], 
-    #                   lower.tail = lower.tail, log.p = log.p)
-    #         qfunc <- function(p, lower.tail = TRUE, log.p = FALSE) 
-    #             qpert(p = p, min  = Values[Line, "Optimal"],
-    #                   mode = Values[Line, "Typical"],
-    #                   max  = Values[Line, "Pessimistic"],
-    #                   lower.tail = lower.tail, log.p = log.p)
-    #         rfunc <- function(n) 
-    #             rpert(n = n, min  = Values[Line, "Optimal"], 
-    #                   mode = Values[Line, "Typical"], 
-    #                   max  = Values[Line, "Pessimistic"])
-    #         Data[[Line]] <- AbscontDistribution(d = dfunc, 
-    #                                             p = pfunc,
-    #                                             q = qfunc,
-    #                                             r = rfunc,
-    #                                             withgaps = FALSE)#, withStand = TRUE)
-    #     }
-    #     names(Data) <- rownames(Values)
-    #     
-    #     # 
-    #     # PooledData <- PoolOpinions(Data, Weights = Weight)
-    #     MixedDistr <- UnivarMixingDistribution(Dlist = Data)#new("DistrList", Data))
-    #     #plot(MixedDistr)
-    #     
-    #     # Add 50% threshold of pooled distribution
-    #     #Threshold50 <- Area50P(X, PooledData)
-    #     
-    #     # list(
-    #     #     Estimates = Values,
-    #     #     PertData = Data,
-    #     #     PooledPertData = PooledData,
-    #     #     Threshold50 = Threshold50,
-    #     #     XValues = X,         # x axis
-    #     #     Weights = Weight
-    #     # )
-    #     return(MixedDistr)
-    # })
-    
-    
-    output$CombiPertStats <- renderTable({
-        Data <- CombinedPertData()
-
-        Mean   <- AvgOfDensities(Data$X, Data$Y)
-        Median <- Area50P(Data$X, Data$Y)
-        Var    <- VarOfDensities(Data$X, Data$Y)
-        StdDev <- sqrt(Var)
-        SixthSigma <- (max(Data$X) - min(Data$X)) / 6
-        
-        data.frame(
-            Parameter = c("Mean", "Median", "Variance", "StdDev", "1/6th sigma"),
-            Value     = c(Mean, Median, Var, StdDev, SixthSigma)
-        )
-    })
-    
-    
-    # Multiple Pert distributions ----
     # Plot a chart with several Pert distributions in it 
     output$MultiPlot <- renderPlot({
         Data   <- MultiPertData()
@@ -292,22 +206,46 @@ server <- function(input, output) {
     
     
     
-    # Pooled distribution ----
-    # Plot a chart after distributions have been pooled together
-    output$CombiPlot <- renderPlot({
+    # Combined = Pooled distribution ----
+    CombinedPertData <- reactive({
         Values <- MultiPertValues()
         Data   <- MultiPertData()
         X <- seq(min(Data$X), max(Data$X), length.out = nrow(Data) / nlevels(Data$Group))
         Y <- rowsum(Data$Y, Data$X) / nlevels(Data$Group)
         Data <- data.frame(X = X, Y = Y) 
         
+        Data
+    })
+    
+    
+    output$CombiPertStats <- renderTable({
+        Data <- CombinedPertData()
+        
+        Mean   <- AvgOfDensities(Data$X, Data$Y)
+        Median <- Area50P(Data$X, Data$Y)
+        Var    <- VarOfDensities(Data$X, Data$Y)
+        StdDev <- sqrt(Var)
+        SixthSigma <- (max(Data$X) - min(Data$X)) / 6
+        
+        data.frame(
+            Parameter = c("Mean", "Median", "Variance", "StdDev", "1/6th sigma"),
+            Value     = c(Mean, Median, Var, StdDev, SixthSigma)
+        )
+    })
+    
+    
+    
+    # Plot a chart after distributions have been pooled together
+    output$CombiPlot <- renderPlot({
+        Values <- req(MultiPertValues())
+        Data   <- req(CombinedPertData())
+        
         # Compute 50% "integral", i.e. quantile
-        Avg50p  <- Area50P(X, Y)
+        Avg50p  <- Area50P(Data$X, Data$Y)
         # Mean
-        AvgMean <- AvgOfDensities(X, Y)
+        AvgMean <- AvgOfDensities(Data$X, Data$Y)
         # Var
-        Variance <- VarOfDensities(X, Y) # sum(apply(Data, 1, function(x) (prod(x) / sum(Data$Y) - AvgMean)^2 ))
-        print(Variance)
+        Variance <- VarOfDensities(Data$X, Data$Y)
         
         # plot PERT distribution
         p <- ggplot(Data, aes(x = X, y = Y)) +
