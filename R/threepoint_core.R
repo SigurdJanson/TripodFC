@@ -15,7 +15,7 @@ library(mc2d)
 #' @param shape The shape argument (double, default = 4). Ignored for 
 #' the `davis` method.
 #' @param method String indicating the estimation technique. Either 
-#' "classic", "vose" or "davis" (which is the default)
+#' "classic", "golgin", "vose" or "davis" (which is the default). See details.
 #' @return A list (with class attribute "betaPERT") containing the elements
 #' alpha, beta, min, mode, max, shape, and method (all doubles except method which 
 #' is a string; see the arguments of this function).
@@ -34,12 +34,16 @@ library(mc2d)
 #' 
 #' Classic: The standard formulas for mean, standard deviation, α and β, are 
 #' as follows:
-#'    mean = (a + k*m + b) / (k + 2)
-#'    sd = (b - a) / (k + 2)
-#'    α = { (mean - a) / (b - a) } * { (mean - a) * (b - mean) / sd^{2} - 1 }
-#'    β = α * (b - mean) / (mean - a)
+#'    mean = (a + k*b + c) / (k + 2)
+#'    sd = (c - a) / (k + 2)
+#'    α = { (mean - a) / (c - a) } * { (mean - a) * (c - mean) / sd^{2} - 1 }
+#'    β = α * (c - mean) / (mean - a)
 #'
 #' The resulting distribution is a 4-parameter Beta distribution: Beta(α, β, a, b).
+#' 
+#' Golenko-Ginzburg (1988; cited by Pleguezuelo, 2003) proposed this parametrization:
+#' α = 1 + k * (b − a) / (c − a)
+#' β = 1 + k * (c − b) / (c − a)
 #' 
 #' Vose: Vose (2008) describes a different formula for α:
 #'    α = (mean - a) * (2 * m - a - b) / { (m - mean) * (b - a) }
@@ -71,7 +75,8 @@ library(mc2d)
 #'  Wiley and Sons.
 #' @source This is an extension of the \link[prevalence]{betaPERT} function 
 #' from the prevalence package.
-Pert2BetaParams <- function(min=-1, mode=0, max=1, shape = 4, method = c("classic", "vose", "davis")) {
+Pert2BetaParams <- function(min=-1, mode=0, max=1, shape = 4, 
+                            method = c("classic", "golgin", "vose", "davis")) {
   # PRECONDITIONS
   if (!is.numeric(min)) stop("Argument 'min' must be a numeric value")
   if (!is.numeric(mode)) stop("Argument 'mode' must be a numeric value")
@@ -88,6 +93,11 @@ Pert2BetaParams <- function(min=-1, mode=0, max=1, shape = 4, method = c("classi
     sdev <- (max - min) / (shape + 2)
     alpha <- ((mu - min) / (max - min)) * ( ((mu - min) * (max - mu) / (sdev^2 )) - 1 )
     beta <- alpha * (max - mu) / (mu - min)
+  }
+
+  if (method == "golgin") {
+    alpha <- 1 + shape * (mode - min) / (max - min)
+    beta  <- 1 + shape * (max - mode) / (max - min)
   }
   
   if (method == "vose") {
@@ -165,109 +175,111 @@ betaPERT <- function(min=-1, mode=0, max=1, shape = 4, method = c("classic", "vo
     return(out)
   }
 
+#' dBetaPert
+#' @description Density function for the PERT (aka Beta PERT) distribution with minimum
+#' equals to min, mode equals to mode and maximum equals to max.
+#' @usage dpert(x, min=-1, mode=0, max=1, shape=4, log=FALSE)
+#' @param x Vector of quantiles.
+#' @param min Vector of minima.
+#' @param mode Vector of modes.
+#' @param max Vector of maxima.
+#' @param shape	Vector of scaling parameters. Default value: 4.
+#' @param log Logical; if TRUE, probabilities p are given as log(p).
+#' @note Adapted from the 'mc2d' package
+#' @author Regis Pouillot
+#' @author Matthew Wiener
+#' @references R. Pouillot, M.-L. Delignette-Muller (2010), Evaluating variability and uncertainty in
+#' microbial quantitative risk assessment using two R packages. International Journal of Food Microbiology. 142(3):330-40
+dBetaPert <- function(x, min = 0, mode = 0.5, max = 1, shape = 4, log = FALSE,
+                      method=c("classic", "golgin", "vose", "davis")) {
+  if (length(x) == 0) return(numeric(0))
+  
+  min   <- as.vector(min)
+  mode  <- as.vector(mode)
+  max   <- as.vector(max)
+  shape <- as.vector(shape)
+  
+  Params <- Pert2BetaParams(min, mode, max, shape, method)
+  alpha <- Params$alpha
+  beta  <- Params$beta
+  #a1 <- 1 + shape * (mode - min)/(max - min)
+  #a2 <- 1 + shape * (max - mode)/(max - min)
+  
+  oldw <- options(warn = -1)
+  d <- (x - min)^(alpha - 1) * (max - x)^(beta - 1) /
+    beta(a = alpha, b = beta) /
+    (max - min)^(alpha + beta - 1)
+  options(warn = oldw$warn)
+  
+  d[x < min | x > max] <- 0
+  d[mode < min | max < mode] <- NaN
+  d[shape <= 0] <- NaN
+  
+  if (log) d <- log(d)
+  if (any(is.na(d)))
+    warning("NaN in dBetaPert")
+  
+  return(d)
+}
 
 
-#' #' dpert
-#' #' @description Density function for the PERT (aka Beta PERT) distribution with minimum 
-#' #' equals to min, mode equals to mode and maximum equals to max.
-#' #' @usage dpert(x, min=-1, mode=0, max=1, shape=4, log=FALSE)
-#' #' @param x Vector of quantiles.
-#' #' @param min Vector of minima.
-#' #' @param mode Vector of modes.
-#' #' @param max Vector of maxima.
-#' #' @param shape	Vector of scaling parameters. Default value: 4.
-#' #' @param log Logical; if TRUE, probabilities p are given as log(p).
-#' #' @details Taken from the 'mc2d' package
-#' #' @author Regis Pouillot
-#' #' @author Matthew Wiener
-#' #' @references R. Pouillot, M.-L. Delignette-Muller (2010), Evaluating variability and uncertainty in 
-#' #' microbial quantitative risk assessment using two R packages. International Journal of Food Microbiology. 142(3):330-40 
-#' dpert <- function (x, min = -1, mode = 0, max = 1, shape = 4, log = FALSE) 
-#' {
-#'   if (length(x) == 0) 
-#'     return(numeric(0))
-#'   
-#'   min <- as.vector(min)
-#'   mode <- as.vector(mode)
-#'   max <- as.vector(max)
-#'   shape <- as.vector(shape)
-#' 
-#'   a1 <- 1 + shape * (mode - min)/(max - min)
-#'   a2 <- 1 + shape * (max - mode)/(max - min)
-#'   
-#'   oldw <- options(warn = -1)
-#'   d <- (x - min)^(a1 - 1) * (max - x)^(a2 - 1) / 
-#'     beta(a = a1, b = a2) / 
-#'     (max - min)^(a1 + a2 - 1)
-#'   options(warn = oldw$warn)
-#'   
-#'   d[x < min | x > max] <- 0
-#'   d[mode < min | max < mode] <- NaN
-#'   d[shape <= 0] <- NaN
-#'   
-#'   if (log) d <- log(d)
-#'   if (any(is.na(d))) 
-#'     warning("NaN in dpert")
-#'   
-#'   return(d)
-#' }
-#' 
-#' 
-#' #' qpert
-#' #' @description Quantile function for the PERT (aka Beta PERT) distribution with minimum 
-#' #' equals to min, mode equals to mode and maximum equals to max.
-#' #' @usage qpert(p, min=-1, mode=0, max=1, shape=4, lower.tail=TRUE, log.p=FALSE)
-#' #' @param p Vector of probabilities.
-#' #' @param min Vector of minima.
-#' #' @param mode Vector of modes.
-#' #' @param max Vector of maxima.
-#' #' @param shape	Vector of scaling parameters. Default value: 4.
-#' #' @param log.p Logical; if TRUE, probabilities p are given as log(p).
-#' #' @param lower.tail Logical; if TRUE (default), probabilities are P[X <= x], otherwise, P[X > x].
-#' #' @details Taken from the 'mc2d' package
-#' #' @author Regis Pouillot
-#' #' @author Matthew Wiener
-#' #' @references R. Pouillot, M.-L. Delignette-Muller (2010), Evaluating variability and uncertainty in 
-#' #' microbial quantitative risk assessment using two R packages. International Journal of Food Microbiology. 142(3):330-40 
-#' qpert <- function (p, min = -1, mode = 0, max = 1, shape = 4, lower.tail = TRUE, 
-#'           log.p = FALSE) 
-#' {
-#'   if (length(p) == 0)
-#'     return(numeric(0))
-#'   min <- as.vector(min)
-#'   mode <- as.vector(mode)
-#'   max <- as.vector(max)
-#'   shape <- as.vector(shape)
-#' 
-#'   lout <- max(length(p), length(min), length(mode), length(max), length(shape))
-#'   min <- rep(min, length.out = lout)
-#'   mode <- rep(mode, length.out = lout)
-#'   max <- rep(max, length.out = lout)
-#'   shape <- rep(shape, length.out = lout)
-#' 
-#'   if (log.p) 
-#'     p <- exp(p)
-#'   if (!lower.tail) 
-#'     p <- 1 - p
-#' 
-#'   a1 <- 1 + shape * (mode - min)/(max - min)
-#'   a2 <- 1 + shape * (max - mode)/(max - min)
-#'   
-#'   oldw <- options(warn = -1)
-#'   q <- qbeta(p, shape1 = a1, shape2 = a2)
-#'   options(warn = oldw$warn)
-#'   
-#'   q <- q * (max - min) + min
-#'   minmodemax <- (abs(min - max) < (.Machine$double.eps^0.5))
-#'   q <- ifelse(minmodemax, min, q)
-#'   q[p < 0 | p > 1] <- NaN
-#'   q[mode < min | max < mode] <- NaN
-#'   q[shape <= 0] <- NaN
-#'   
-#'   if (any(is.na(q))) 
-#'     warning("NaN in qpert")
-#'   return(q)
-#' }
+
+#' qBetaPert
+#' @description Quantile function for the PERT (aka Beta PERT) distribution with minimum
+#' equals to min, mode equals to mode and maximum equals to max.
+#' @usage qpert(p, min=-1, mode=0, max=1, shape=4, lower.tail=TRUE, log.p=FALSE)
+#' @param p Vector of probabilities.
+#' @param min Vector of minima.
+#' @param mode Vector of modes.
+#' @param max Vector of maxima.
+#' @param shape	Vector of scaling parameters. Default value: 4.
+#' @param log.p Logical; if TRUE, probabilities p are given as log(p).
+#' @param lower.tail Logical; if TRUE (default), probabilities are P[X <= x], otherwise, P[X > x].
+#' @note Adapted from the 'mc2d' package
+#' @author Regis Pouillot
+#' @author Matthew Wiener
+#' @references R. Pouillot, M.-L. Delignette-Muller (2010), Evaluating variability and uncertainty in
+#' microbial quantitative risk assessment using two R packages. International Journal of Food Microbiology. 142(3):330-40
+qBetaPert <- function (p, min = -1, mode = 0, max = 1, shape = 4, 
+                       lower.tail = TRUE, log.p = FALSE,
+                       method=c("classic", "golgin", "vose", "davis"))
+{
+  if (length(p) == 0)
+    return(numeric(0))
+  min <- as.vector(min)
+  mode <- as.vector(mode)
+  max <- as.vector(max)
+  shape <- as.vector(shape)
+
+  lout <- max(length(p), length(min), length(mode), length(max), length(shape))
+  min <- rep(min, length.out = lout)
+  mode <- rep(mode, length.out = lout)
+  max <- rep(max, length.out = lout)
+  shape <- rep(shape, length.out = lout)
+
+  if (log.p)
+    p <- exp(p)
+  if (!lower.tail)
+    p <- 1 - p
+
+  alpha <- Params$alpha
+  beta  <- Params$beta
+
+  oldw <- options(warn = -1)
+  q <- qbeta(p, shape1 = alpha, shape2 = beta)
+  options(warn = oldw$warn)
+
+  q <- q * (max - min) + min
+  minmodemax <- (abs(min - max) < (.Machine$double.eps^0.5))
+  q <- ifelse(minmodemax, min, q)
+  q[p < 0 | p > 1] <- NaN
+  q[mode < min | max < mode] <- NaN
+  q[shape <= 0] <- NaN
+
+  if (any(is.na(q)))
+    warning("NaN in qpert")
+  return(q)
+}
 
 
 
