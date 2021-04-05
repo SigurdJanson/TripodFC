@@ -133,13 +133,10 @@ Pert2BetaParams <- function(min=-1, mode=0, max=1, shape = 4,
 #' dBetaPert
 #' @description Density function for the PERT (aka Beta PERT) distribution with minimum
 #' equals to min, mode equals to mode and maximum equals to max.
-#' @usage dpert(x, min=-1, mode=0, max=1, shape=4, log=FALSE)
+#' @usage dBetaPert(x, min=-1, mode=0, max=1, shape=4, log=FALSE, method="davis")
 #' @param x Vector of quantiles.
-#' @param min Vector of minima.
-#' @param mode Vector of modes.
-#' @param max Vector of maxima.
-#' @param shape	Vector of scaling parameters. Default value: 4.
 #' @param log Logical; if TRUE, probabilities p are given as log(p).
+#' @inheritParams Pert2BetaParams
 #' @note Adapted from the 'mc2d' package
 #' @author Regis Pouillot
 #' @author Matthew Wiener
@@ -155,10 +152,8 @@ dBetaPert <- function(x, min = 0, mode = 0.5, max = 1, shape = 4, log = FALSE,
   shape <- as.vector(shape)
   
   Params <- Pert2BetaParams(min, mode, max, shape, method)
-  alpha <- Params$alpha
-  beta  <- Params$beta
-  #a1 <- 1 + shape * (mode - min)/(max - min)
-  #a2 <- 1 + shape * (max - mode)/(max - min)
+  alpha  <- Params$alpha
+  beta   <- Params$beta
   
   oldw <- options(warn = -1)
   d <- (x - min)^(alpha - 1) * (max - x)^(beta - 1) /
@@ -182,14 +177,11 @@ dBetaPert <- function(x, min = 0, mode = 0.5, max = 1, shape = 4, log = FALSE,
 #' qBetaPert
 #' @description Quantile function for the PERT (aka Beta PERT) distribution with minimum
 #' equals to min, mode equals to mode and maximum equals to max.
-#' @usage qpert(p, min=-1, mode=0, max=1, shape=4, lower.tail=TRUE, log.p=FALSE)
+#' @usage qBetaPert(p, min=-1, mode=0, max=1, shape=4, lower.tail=TRUE, log.p=FALSE, method="davis")
 #' @param p Vector of probabilities.
-#' @param min Vector of minima.
-#' @param mode Vector of modes.
-#' @param max Vector of maxima.
-#' @param shape	Vector of scaling parameters. Default value: 4.
 #' @param log.p Logical; if TRUE, probabilities p are given as log(p).
 #' @param lower.tail Logical; if TRUE (default), probabilities are P[X <= x], otherwise, P[X > x].
+#' @inheritParams Pert2BetaParams
 #' @note Adapted from the 'mc2d' package
 #' @author Regis Pouillot
 #' @author Matthew Wiener
@@ -201,15 +193,15 @@ qBetaPert <- function (p, min = -1, mode = 0, max = 1, shape = 4,
 {
   if (length(p) == 0)
     return(numeric(0))
-  min <- as.vector(min)
-  mode <- as.vector(mode)
-  max <- as.vector(max)
+  min   <- as.vector(min)
+  mode  <- as.vector(mode)
+  max   <- as.vector(max)
   shape <- as.vector(shape)
 
-  lout <- max(length(p), length(min), length(mode), length(max), length(shape))
-  min <- rep(min, length.out = lout)
-  mode <- rep(mode, length.out = lout)
-  max <- rep(max, length.out = lout)
+  lout  <- max(length(p), length(min), length(mode), length(max), length(shape))
+  min   <- rep(min, length.out = lout)
+  mode  <- rep(mode, length.out = lout)
+  max   <- rep(max, length.out = lout)
   shape <- rep(shape, length.out = lout)
 
   if (log.p)
@@ -217,8 +209,9 @@ qBetaPert <- function (p, min = -1, mode = 0, max = 1, shape = 4,
   if (!lower.tail)
     p <- 1 - p
 
-  alpha <- Params$alpha
-  beta  <- Params$beta
+  Params <- Pert2BetaParams(min, mode, max, shape, method)
+  alpha  <- Params$alpha
+  beta   <- Params$beta
 
   oldw <- options(warn = -1)
   q <- qbeta(p, shape1 = alpha, shape2 = beta)
@@ -232,16 +225,18 @@ qBetaPert <- function (p, min = -1, mode = 0, max = 1, shape = 4,
   q[shape <= 0] <- NaN
 
   if (any(is.na(q)))
-    warning("NaN in qpert")
+    warning("NaN in qBetaPert")
   return(q)
 }
 
 
 
 #' weighted.gmean
+#' Weighted gemotric mean
 #' @param x an object containing the values whose weighted mean is to be computed.
 #' @param w	a numerical vector of weights the same length as x giving the weights 
 #' to use for elements of x.
+#' @param scl arbitrary scaling factor
 #' @param na.rm	a logical value indicating whether NA values in x should be 
 #' stripped before the computation proceeds.
 #' @details Returns NaN when all weights are 0.
@@ -267,9 +262,11 @@ weighted.gmean <- function(x, w, scl = 1, na.rm = FALSE) {
 
 
 #' weighted.prod
-#' @param x an object containing the values whose weighted mean is to be computed.
+#' Computes a weighted product
+#' @param x an object containing the values whose weighted product is to be computed.
 #' @param w	a numerical vector of weights the same length as x giving the weights 
 #' to use for elements of x.
+#' @param scl arbitrary scaling factor
 #' @param na.rm	a logical value indicating whether NA values in x should be 
 #' stripped before the computation proceeds.
 #' @note This function is not finished/correct.
