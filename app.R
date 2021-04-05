@@ -13,7 +13,6 @@ Precision <- 50000
 
 # Define UI for app that draws a histogram ----
 ui <- fluidPage(
-    # App title ----
     titlePanel("Tripod FC"),
     
     tabsetPanel(
@@ -89,11 +88,8 @@ server <- function(input, output) {
         
         Mean <- (input$Optimistic0 + 4*input$Typical0 + input$Pessimistic0) / 6
         # Median
-        Median <- qpert(0.5, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
-            #qbeta(0.5, alpha, beta) * 
-            #(input$Pessimistic0 - input$Optimistic0) + input$Optimistic0
-        # Median = (input$Optimistic0 + 6*input$Typical0 + input$Pessimistic0) / 8
-        Var  <- (Mean - input$Optimistic0) * (input$Pessimistic0 - Mean) / 7
+        Median <- qBetaPert(0.5, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
+        Var    <- (Mean - input$Optimistic0) * (input$Pessimistic0 - Mean) / 7
         StdDev <- sqrt(Var)
         SixthSigma <- (input$Pessimistic0 - input$Optimistic0) / 6
         
@@ -115,8 +111,10 @@ server <- function(input, output) {
         )
         
         X <- seq(input$Optimistic0, input$Pessimistic0, length.out=Precision)
-        Data <- data.frame(X = X, 
-                           Y = dpert(X, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0))
+        Data <- data.frame(
+            X = X, 
+            Y = dBetaPert(X, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
+        )
         
         # plot PERT distribution
         p <- ggplot(Data, aes(x = X, y = Y)) +
@@ -127,19 +125,25 @@ server <- function(input, output) {
                 ggtitle("Estimated Distribution") +
                 scale_x_continuous(name="Estimate") + scale_y_continuous(name="Subjective Probability")
         
+        #-print(paste("max(Data$Y)", max(Data$Y), " - X: ", Data$X[which.max(Data$Y)]))
+
         # Explicit 3-point estimate using the integral
-        Avg50p <- qpert(0.5, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
+        Avg50p <- qBetaPert(0.5, min=input$Optimistic0, mode=input$Typical0, max=input$Pessimistic0)
+        AvgMean <- (input$Optimistic0 + 4L*input$Typical0 + input$Pessimistic0) / 6
+
+        # Plot median, i.e. Avg50p
+        Alignment <- ifelse(Avg50p >= AvgMean, "left", "right")
         p <- p + annotate("point", x = Avg50p, y = 0, size = 5, colour = "red", alpha = 1/2) +
                  geom_vline(aes(xintercept = Avg50p), color = "red", alpha = 1/5) +
-                 annotate("label", hjust = "right", colour = "red", alpha = 5/10,
+                 annotate("label", hjust = Alignment, colour = "red", alpha = 5/10,
                           x = Avg50p, y = max(Data$Y)/20,
                           label = format(Avg50p, digits = 2L, nsmall = 2L))
         
-        # Weighted 3-point estimate
-        AvgMean <- (input$Optimistic0 + 4L*input$Typical0 + input$Pessimistic0) / 6
+        # Plot weighted 3-point estimate, i.e. mean
+        Alignment <- ifelse(Avg50p < AvgMean, "left", "right")
         p <- p + annotate("point", x = AvgMean, y = 0, size = 5, colour = "green", alpha = 1/2) +
                  geom_vline(aes(xintercept = AvgMean), color = "green", alpha = 1/5) +
-                 annotate("label", hjust = "left", colour = "green", alpha = 5/10,
+                 annotate("label", hjust = Alignment, colour = "green", alpha = 5/10,
                           x = AvgMean, y = max(Data$Y)/20, 
                           label = format(AvgMean, digits = 2L, nsmall = 2L))
         
@@ -147,6 +151,7 @@ server <- function(input, output) {
     })
     
     
+    # Team Distributions ----
     MultiPertValues <- reactive({
         Values <- na.omit( input$TeamMatrix )
         Estimators <- nrow(Values)
@@ -157,7 +162,6 @@ server <- function(input, output) {
     })
     
     
-    # Team Distributions ----
     # Generate the data set required for the Team tab 
     MultiPertData <- reactive({
         Values <- req(MultiPertValues())
@@ -166,7 +170,7 @@ server <- function(input, output) {
         Data <- data.frame()
         
         for (Line in 1:nrow(Values)) {
-            Y <- dpert(X, min = Values[Line, 1], mode=Values[Line, 2], max=Values[Line, 3])
+            Y <- dBetaPert(X, min = Values[Line, 1], mode=Values[Line, 2], max=Values[Line, 3])
             GroupName <- ifelse(is.null(rownames(Values)[Line]), Line, rownames(Values)[Line])
             Group <- rep(rownames(Values)[Line], length(X))
             Data  <- rbind(Data, data.frame(X = X, Y = Y, Group = Group))
@@ -197,7 +201,7 @@ server <- function(input, output) {
         for (Line in 1:nrow(Values)) {
             Name <- rownames(Values)[Line]
             PosX <- Values[Line, 2] + ((Values[Line, 3] - Values[Line, 1]) * 0.1 )
-            PosY <- dpert(Values[Line, 2], min = Values[Line, 1], mode=Values[Line, 2], max=Values[Line, 3])
+            PosY <- dBetaPert(Values[Line, 2], min = Values[Line, 1], mode=Values[Line, 2], max=Values[Line, 3])
             p <- p + annotate("label", x = PosX, y = PosY, label = Name, alpha = 3/10)
         }
         
@@ -214,7 +218,7 @@ server <- function(input, output) {
         Y <- rowsum(Data$Y, Data$X) / nlevels(Data$Group)
         Data <- data.frame(X = X, Y = Y) 
         
-        Data
+        return(Data)
     })
     
     
@@ -252,16 +256,26 @@ server <- function(input, output) {
             geom_line() +
             annotate("point", x = min(Values), y = 0, size = 5, colour = "blue", alpha = 1/5) +
             annotate("point", x = max(Values), y = 0, size = 5, colour = "blue", alpha = 1/5) +
-            annotate("point", x = Avg50p, y = 0, size = 5, colour = "red", alpha = 1/5) +
-            annotate("label", x = Avg50p, y = max(Data$Y)/20, size = 5, colour = "red", alpha = 1/5, label = format(Avg50p, digits = 2L, nsmall = 2L)) +
-            annotate("point", x = AvgMean, y = 0, size = 5, colour = "green", alpha = 1/5) +
-            annotate("label", x = AvgMean, y = max(Data$Y)/20, size = 5, colour = "green", alpha = 1/5, label = format(AvgMean, digits = 2L, nsmall = 2L)) +
             ggtitle("Mixed Distribution") +
             scale_x_continuous(name="Estimate") + scale_y_continuous(name="Subjective Probability")
         
+        # Add median marker, i.e. Area50p
+        Alignment <- ifelse(Avg50p > AvgMean, "left", "right")
+        p <- p +
+            annotate("point", x = Avg50p, y = 0, size = 5, colour = "red", alpha = 1/5) +
+            annotate("label", x = Avg50p, y = max(Data$Y)/20, hjust = Alignment, 
+                     size = 5, colour = "red", alpha = 1/5, 
+                     label = format(Avg50p, digits = 2L, nsmall = 2L))
+            
+        Alignment <- ifelse(Avg50p <= AvgMean, "left", "right")
+        p <- p +
+            annotate("point", x = AvgMean, y = 0, size = 5, colour = "green", alpha = 1/5) +
+            annotate("label", x = AvgMean, y = max(Data$Y)/20, hjust = Alignment,
+                     size = 5, colour = "green", alpha = 1/5, 
+                     label = format(AvgMean, digits = 2L, nsmall = 2L))
+            
         return(p)
     })
-    
 }
 
 
