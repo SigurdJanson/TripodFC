@@ -129,51 +129,6 @@ Pert2BetaParams <- function(min=-1, mode=0, max=1, shape = 4,
 
 
 
-#' betaPERT
-#' 
-#' Parametrize a generalized Beta distribution
-#' @param min Pessimistic estimate (Minimum value)
-#' @param mode Most likely estimate (Mode)
-#' @param max Optimistic estimate (Maximum value)
-#' @param shape Scale parameter
-#' @param method "classic" or "vose"; see details below
-#' @author Brecht Devleesschauwer <\email{brechtdv@@gmail.com}> 
-betaPERT <- function(min=-1, mode=0, max=1, shape = 4, method = c("classic", "vose")) {
-    ## check input
-    if (!exists("min")) stop("'min' is missing")
-    if (!exists("mode")) stop("'mode' is missing")
-    if (!exists("max")) stop("'max' is missing")
-    if (!exists("shape")) stop("'shape' is missing")
-    if (!is.numeric(min)) stop("'min' must be a numeric value")
-    if (!is.numeric(mode)) stop("'mode' must be a numeric value")
-    if (!is.numeric(max)) stop("'max' must be a numeric value")
-    if (!is.numeric(shape)) stop("'shape' must be a numeric value")
-  
-    if (!exists("method")) stop("'method' is missing")
-    method <- match.arg(method)
-    
-    if (method == "classic") {
-      mu <- (min + shape * mode + max) / (shape + 2)
-      sdev <- (max - min) / (shape + 2)
-      alpha <- ((mu - min) / (max - min)) * ( ((mu - min) * (max - mu) / (sdev^ 2 )) - 1 )
-      beta <- alpha * (max - mu) / (mu - min)
-    }
-    
-    if (method == "vose") {
-      mu <- (min + shape * mode + max) / (shape + 2)
-      alpha <- ifelse(mu == mode, 
-                      1 + shape / 2, # avoid div/0
-                      ((mu - min) * (2 * mode - min - max)) / ((mode - mu) * (max - min)))
-      beta <- alpha * (max - mu) / (mu - min)
-    }
-    
-    out <- list(alpha = alpha, beta = beta,
-                min = min, mode = mode, max = max,
-                method = method)
-    class(out) <- "betaPERT"
-    
-    return(out)
-  }
 
 #' dBetaPert
 #' @description Density function for the PERT (aka Beta PERT) distribution with minimum
