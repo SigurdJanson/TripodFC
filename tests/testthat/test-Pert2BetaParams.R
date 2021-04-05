@@ -15,16 +15,19 @@ test_that("Do all methods return proper types", {
     expect_s3_class(obs, "betaPERT")
     expect_named(obs, c("alpha", "beta", "min", "mode", "max", "shape", "method"))
     
-    expect_identical(obs$min, min)
+    expect_identical(obs$min,  min)
     expect_identical(obs$mode, mode)
-    expect_identical(obs$max, max)
+    expect_identical(obs$max,  max)
     expect_identical(obs$shape, shape)
     expect_identical(obs$method, mt)
   }
 })
 
 
-# CLASSIC  -------
+# CLASSIC
+
+
+# GOLENKO-GINZBURG  -------
 
 # example taken from 
 # https://www.real-statistics.com/binomial-and-related-distributions/pert-distribution/
@@ -33,7 +36,7 @@ test_that("Specific examples", {
   max <- 9
   mode <- 6
   obs <- expect_silent(
-    Pert2BetaParams(min, mode, max, method = "classic")
+    Pert2BetaParams(min, mode, max, method = "golgin")
   )
   expect_equal(obs$alpha, 3.5)
   expect_equal(obs$beta,  2.5)
@@ -115,6 +118,7 @@ test_that("Specific examples", {
   max   <- c(9, 6, 7, 3, 8, 10, 12, 15, 30, 4)
   alpha <- c(4, 14/3, 1.968, 10/3, 4.3125, 1.3434, 1.3434, 1.0845, 1.968, 4.6173)
   beta  <- c(4,  7/3, 4.592,  2/3, 1.4375, 4.2369, 4.2369, 3.9767, 4.592, 2.9383)
+  # use the maximum possible tolerance
   tol   <- c(1E-5, 1E-15, 1E-5, 1E-15, 1E-5, 5E-5, 5E-5, 5E-5, 1E-5, 1E-5)
   
   for (i in 1:length(min)) {

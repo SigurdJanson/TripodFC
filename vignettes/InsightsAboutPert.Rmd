@@ -14,90 +14,102 @@ knitr::opts_chunk$set(echo = TRUE)
 source("../R/threepoint_core.R")
 ```
 
-A Pert distribution with a range from $a$ to $c$ and a mode of $b$. This note book tries to solve some puzzles regarding the Pert distribution. 
+A Pert distribution with a range from $a$ to $c$ and a mode of $b$. This note book tries to solve some puzzles regarding the Pert distribution. There is a lot of discussion in the literature regarding some shortcomings of the Pert distribution. Mainly because the standard deviation would not be fixed to 1/6th like the original authors claimed [@US1958].
 
 
 
-# Mean and Standard Deviation
+# Understanding the Problem
+
+The Pert probability distribution is essentially a special case of the Beta distribution. 
 
 ## Mean
 
 Every source says that the mean of the Pert distribution was:
 
-$$ \operatorname {E} [X]= \frac{a+4b+c}{6} = \frac{a+k \cdot b+c}{k+2} = \mu $$
+$$
+\begin{equation}
+  \operatorname{E}[X]= \frac{a+4b+c}{6} = \frac{a+\lambda \cdot b+c}{\lambda+2} = \mu
+\end{equation}
+$$
 
-Strangely, this is also the same equation of the [double triangular distribution](http://www.mhnederlof.nl/doubletriangular.html) [as noted by @Henry27280]. However, I couldn't find any reason or source that justifies the connection for that and it seems like a coincidence.
+Sometimes, an additional shape argument λ is used to which @Vose2008 refers as "modified Pert". He suggests that estimates can be improved if subject matter experts do not only estimate range and mode of the distribution but the distribution shape, as well. For the classic Pert distribution $\lambda = 4$.
 
-Looking closer at the mathematics it becomes clear that the Pert distribution cannot guarantee the specified mean. It is a special case of the beta distribution. The general formula for the mean of the $beta(\alpha, \beta, a, c)$ distributions is [@enwiki1011418887; @Treat1983]:
+Strangely, this mean is also the same equation of the [double triangular distribution](http://www.mhnederlof.nl/doubletriangular.html) [as noted by @Henry27280]. @Henry27280 speculates that the Pert mean would come from the double triangular. However, I couldn't find any reason or source that justifies the connection for that and it seems like a coincidence.
+
+Looking closer at the mathematics it becomes clear that the Beta distribution cannot guarantee the specified mean. It is a special case of the beta distribution. The general formula for the mean of the $beta(\alpha, \beta, a, c)$ distribution is [@enwiki1011418887; @Treat1983]:
 
 $$
 \mu = \frac\alpha{\alpha+\beta} \cdot (c-a) + a = \frac{\alpha c + \beta a}{\alpha+\beta}
 $$
 
-So, it is clear that it is not at all determined by the max/min parameters. It is also influenced by two parameters α and β. For a long time these have defined as
-
-$$ \alpha = {(\mu - a) (2 \cdot b-a-c)\over (b-\mu) (c - a)} $$
-
-and
-
-$$ \beta = \alpha \cdot {(c - \mu) \over (\mu - a)} $$
-
+So, it is clear that it is not at all determined by the max/min parameters. It is also influenced by two parameters α and β. Finding the right parameters is then crucial.
 
 
 ## Standard Deviation
- 
+
 The standard deviation of the Pert distribution is known as one sixth of it's total range.
 
 $$ \sigma = {c - a \over 6} = \frac{1}{6}(c - a)$$
 
-However, that is an approximation. The exact formula for the variance is [@enwiki1001556353]
+However, that is an approximation. The exact formula for the variance is [@enwiki1001556353]:
 
 $$
 \sigma^2 = \frac{(\mu-a)(c-\mu)}{7}
 $$
 
-or in terms of the beta distribution:
-
- $$ \text{var}(X)(c-a)^2 = 
-    \frac{\alpha\beta (c-a)^2} {(\alpha+\beta)^2(\alpha+\beta+1)} $$
-
-
 Given the above formula of the Pert mean and the fact that the standard deviation is the square root of the variance this is the exact formula.
 
 $$
 \sigma = 
-\sqrt{\frac{(\mu-a)(c-\mu)}{7}} = \\ 
-\frac{1}{6} \cdot \sqrt{ \frac{5 a^2 + 16ab - 26ac - 16b^2 + 16bc + 5 c^2}{7} }
+\sqrt{\frac{(\mu-a)(c-\mu)}{7}} 
 $$
+<!--= \\ \frac{1}{6} \cdot \sqrt{ \frac{5 a^2 + 16ab - 26ac - 16b^2 + 16bc + 5 c^2}{7} }-->
 
-Let us simplify this by setting the min $a=0$ and the max value $c=1$ for demonstration purposes. That leaves:
+For demonstration purposes let us simplify this by setting the min $a=0$ and the max value $c=1$. That leaves:
 
 $$
 \sigma = 
 \frac{1}{6} \cdot \sqrt{ \frac{- 16b^2 + 16b + 5}{7} } = \frac{1}{6} \cdot \sqrt{ \frac{5 - 16 (b - 1) b}{7} }
 $$
 
-```{r}
+```{r Sigma Plot, echo=FALSE}
 library(ggplot2)
 b <- seq(0, 1, 0.05)
 sigma <- sqrt( (5-16*(b-1)*b) / 7 ) / 6
 data <- data.frame(b, sigma)
-ggplot(data, aes(x = b, y = sigma)) + geom_line()
+ggplot(data, aes(x = b, y = sigma)) + 
+  geom_line() +
+  geom_hline(yintercept=1/6, linetype="dashed") + #, color = "red"
+  ggtitle("True Standard Deviation of the Beta Distribution") +
+  scale_x_continuous(name="Mode b") + scale_y_continuous(name="Standard Deviation") +
+  theme_linedraw()
 ```
 
-As we can see the standard deviation depends on the most likely estimate $b$. It ranges around 1/6 = `r format(1/6, digits=2, nsmall = 3)` from `r format(min(sigma), digits=2, nsmall = 3)` to `r format(max(sigma), digits=2, nsmall = 3)`. Such variations are why @Farnum1987 warned about using the approximation in extreme cases when the most-likely estimate is close to the minimum or maximum, i. e. close than 13% of the total range.
+As we can see the standard deviation depends on the most likely estimate $b$. It ranges around 1/6 = `r format(1/6, digits=2, nsmall = 3)` (shown by the dashed line) from `r format(min(sigma), digits=2, nsmall = 3)` to `r format(max(sigma), digits=2, nsmall = 3)`. Such variations are why @Farnum1987 warned about using the approximation in extreme cases when the most-likely estimate is close to the minimum or maximum, i. e. close than 13% of the total range.
+
+
+However, the above equations have been set up under one assumption: a certain way to calculate the α and β shape parameters of the beta distribution.
+
+In terms of the beta distribution the variance is:
+
+$$ \text{var}(X)(c-a)^2 = 
+    \frac{\alpha\beta (c-a)^2} {(\alpha+\beta)^2(\alpha+\beta+1)} $$
+
+Again it is easy to see how the shape parameters of the beta distribution are related to the variance of the distribution. The α and β parameters of the beta distribution determine mean and variance of the distribution.
+
+
+
 
 
 ## Synthesis?
 
-How can these discrepancy be addressed? I found three approaches in the literature.
+How can these discrepancies be addressed? I found three approaches in the literature.
 
  1. Find ways to parametrize the beta distribution exactly to guarantee the defined mean and standard deviation [@Davis2008].
- 1. Find new equations that give the correct (or a more correct) mean and standard deviation [e.g. @Lau1998; @GolenkoGinzburg1988; summarized and challenged by @Perez2017].
- 1. Yet others investigate the relation between mean/standard deviation and the shape parameter of the Pert distribution [see @Pleguezuelo2003].
+ 2. Find new equations that give the correct (or a more correct) mean and standard deviation [e.g. @Lau1998; @GolenkoGinzburg1988; summarized and challenged by @Perez2017].
+ 3. Yet others investigate the relation between mean/standard deviation and the shape parameter of the Pert distribution [see @Pleguezuelo2003].
 
-
-Would it not be interesting if we could really make a fixed standard deviation possible? If we solve the equations for a simple example it becomes clear that there is a discrepancy. The plot shows the variances (y-axis) depending on mode (x-axis), and the parametrization method (colour). The variances of Davis and Vose have been moved a little bit to the right because it would not be possible to dinstinguish those from other equations.
+Only the first solution seems to be something other than a crutch. If we could really find a way to have the fixed standard deviation why should we not go for it? If we solve the equations for a simple example it becomes clear that there is a discrepancy. The plot shows the variances (y-axis) depending on mode (x-axis), and the parametrization method (colour). The variances of Davis and Vose have been moved a little bit to the right because it would not be possible to distinguish those from other equations.
 
 ```{r echo=FALSE}
 library(ggplot2)
@@ -159,13 +171,9 @@ ggplot(Data, aes(x = Mode, y = Mean, colour = Method)) +
   labs(x = "Mean", y = "Mode")
 ```
 
-
-A similar experiment with distribution means shows no deviation from the mean. Regardless of the parametrization method 
-
-
+A similar experiment with distribution means shows no deviation from the mean. Regardless of the parametrization method
 
 All in all, @Davis2008 handles the inconsistency. It is probably better to avoid the `pert` distribution family of the [mc2d](https://rdrr.io/cran/mc2d/) [@Pouillot2010a] package. Instead, compute α and β using the equations from @Davis2008 and use the generalized [beta distribution (betagen)](https://rdrr.io/cran/mc2d/man/betagen.html) instead.
-
 
 
 
@@ -175,64 +183,65 @@ A rough estimate of the median is [@enwiki1011418887]
 
 $$ Median = \frac{(a + 6*b + c)}{8} $$
 
-The actual definition of the median is 
+The actual definition of the median is
 
-$$ I_{\frac {1}{2}}^{[-1]}(\alpha, \beta ) (c-a) + a $$
-for which the regularized incomplete beta function 
+$$ I_{\frac {1}{2}}^{[-1]}(\alpha, \beta ) (c-a) + a $$ for which the regularized incomplete beta function
 
-$$ {\displaystyle I_{x}(\alpha,\beta )={\tfrac {1}{2}}}I_x(\alpha,\beta) = \tfrac{1}{2}$$. 
+$$ {\displaystyle I_{x}(\alpha,\beta )={\tfrac {1}{2}}}I_x(\alpha,\beta) = \tfrac{1}{2}$$.
 
-However, there is no general closed-form expression for the median of the beta distribution for arbitrary values of α and β. Yet, it can easily be done in R with `qpert(0.5, min=a, mode=b, max=c)` (using the mc2d package) or with `qbeta(0.5, alpha, beta) * (c - a) + a`.
-
-
-
-
+However, there is no general closed-form expression for the median of the beta distribution for arbitrary values of α and β. Yet, it can easily be done in R with `qbeta(0.5, alpha, beta) * (c - a) + a`.
 
 # Parametrization of the Beta distributions
 
 ## Classic
 
-According to @Pouillot2010a this equation is from @Malcolm1959 but I was unable to find it there. Lacking a better source this is from @Pouillot2010a. That is the first reason, why I somewhat doubted the following equation. The second reason is because - [according to the author](https://www.vosesoftware.com/riskwiki/ModifiedPERTdistribution.php) - the `shape` parameter was introduced by @Vose2000 and Vose proposes his own set of formulas. The original publications - it seems - did not intend to change the shape parameter and assumed a fixed shape = 4. Furthermore, the classic formulas as presented by @Pouillot2010a (as shown below) are equivalent to those by @Davis2008.
-
+According to @Pouillot2010a this equation is from @Malcolm1959 but I was unable to find it there. Lacking a better source this is from @Pouillot2010a. That is the first reason, why I somewhat doubted the following equation. The second reason is because - [according to the author](https://www.vosesoftware.com/riskwiki/ModifiedPERTdistribution.php) - the `shape` parameter λ was introduced by @Vose2000 and Vose proposes his own set of formulas. The original publications - it seems - did not intend to change the shape parameter and assumed a fixed shape = 4. Furthermore, the classic formulas as presented by @Pouillot2010a (as shown below) are equivalent to those by @Davis2008.
 
 $$
-\begin{aligned}
-    \mu &= \frac{a + shape * b + c} {shape + 2} \\
-    \sigma &= \frac{c - a}{shape + 2} \\
+\begin{align*}
+    \mu &= \frac{a + \lambda * b + c} {\lambda + 2} \\
+    \sigma &= \frac{c - a}{\lambda + 2} \\
     \alpha &= \frac{\mu - a}{c - a} \cdot \left( \frac{(\mu - a) * (c - \mu)}{\sigma^2} - 1 \right)  \\ 
-           &= \frac{\mu - a}{c - a} \cdot \left( \frac{(\mu - a) * (c - \mu) (shape + 2)^2}{(c - a)^2} - 1 \right)     \\
-           &= \frac{shape (a - c + a shape - b shape) ((a - c)^2 + (a - b) (b - c) shape)} {(a - c)^3 (2 + shape)}     \\
     \beta &= \alpha \cdot \frac{c - \mu}{\mu - a}
-\end{aligned}
+\end{align*}
 $$
-
 
 ## Golenko-Ginzburg (GolGin)
 
 Golenko-Ginzburg [-@GolenkoGinzburg1988; cited by @Pleguezuelo2003] proposed this parametrization:
 
 $$
-α = 1 + k * \frac{b − a}{c − a} \\
-β = 1 + k * \frac{c − b}{c − a}
-$$
+α = 1 + \lambda * \frac{b − a}{c − a} \\
+β = 1 + \lambda * \frac{c − b}{c − a}
+$$ Golenko-Ginzburg lost mean and variance in his equation.
 
 ## Vose
 
-@Vose2008 uses:
+@Vose2008 seems to bring the mean back into the equations.
 
 $$
-\begin{aligned}
+\begin{align*}
   \alpha &= \frac{(\mu - a)(2b-a-c)}{(b-\mu)(c-a)} \\
-         &= \frac{(c + 4b - 5a)}{(c - a)}\\
-  \beta  &= \frac{\alpha (c - \mu)}{\mu - a} \\
-  \text{with } \mu &= \frac{a + 4b + c}{6}
-\end{aligned}
-$$
+  \beta  &= \alpha  \frac{(c - \mu)}{\mu - a}
+\end{align*}
+$$ However, inserting the mean this can be simplified and it turns out that approach by @Vose2008 is equivalent to @GolenkoGinzburg1988.
 
+$$
+\begin{align*}
+  \mu    &= \frac{a + \lambda b + c}{\lambda+2} \\
+  \alpha &= \frac{(\mu - a)(2b-a-c)}{(b-\mu)(c-a)} \\
+         &= \frac{-(\lambda+1) a + \lambda b + c}{c - a}  \\
+         &= 1 + \lambda \cdot \frac{b − a}{c − a} \\
+  \beta  &= \alpha \cdot \frac{(c - \mu)}{\mu - a} \\
+         &= \left(1 + \lambda \cdot \frac{b − a}{c − a} \right) \cdot \frac{c - \mu}{\mu - a} \\
+         &= \frac{a + \lambda b - (\lambda+1) c}{a-c} \\
+         &= 1 + \lambda * \frac{c − b}{c − a}
+\end{align*}
+$$
 
 ## Davis
 
-@Davis2008 finally uses 
+@Davis2008 finally uses
 
 $$
 \begin{aligned}
@@ -243,15 +252,13 @@ $$
 \end{aligned}
 $$
 
-
 Comparing these three approaches, the plot below shows how the beta parameters (y axis) change depending on the position of the mode. The distribution ranges from `a = min = -1` to `b = max = 1` The position of the mode is shown on the x-axis ranges from `min` to `max`. The curves for Vose and Davis are slightly offset because some curves would be too similar to be distinguished.
 
 There is a clear difference between the parameters proposed by Vose and Davis. The Classic parameter, however, cannot be found. It hides behind Davis' parameter curves. That fuels my doubt regarding the classic beta parameter equations proposed by @Pouillot2010a.
 
-The Golenko-Ginzburg parameters are hidden, too, and hide behind Vose's parameters.
+As predicted earlier the Golenko-Ginzburg parameters are hidden, too, and hide behind Vose's parameters.
 
-
-```{r echo=FALSE}
+```{r Compare parametrization, echo=FALSE}
 library(ggplot2)
 min  <- -1
 max  <- +1
@@ -292,7 +299,7 @@ Or maybe all this tells another story. Maybe @Malcolm1959 got it right in the fi
 
 The authors are obviously fully aware of the fact that the beta distribution is still ambiguous unless further assumptions are made. So, @Clark1962 continues:
 
-> Suppose we select one-sixth of the range as the standard deviation (the normal distribution truncated at ±2.66) has its standard deviation 1/6 fo the range, and we feel that this truncated normal distribution is an appropriate simple model for specifying the ratio of the standard deviation to the range). 
+> Suppose we select one-sixth of the range as the standard deviation (the normal distribution truncated at ±2.66) has its standard deviation 1/6 fo the range, and we feel that this truncated normal distribution is an appropriate simple model for specifying the ratio of the standard deviation to the range).
 
 Which could be the assumption capable of defining the Pert beta distribution. And - indeed - @Clark1962 finishes:
 
@@ -300,12 +307,9 @@ Which could be the assumption capable of defining the Pert beta distribution. An
 
 That sounds like @Malcolm1959 and @Clark1962 had already done what @Davis2008 (re-?) invented 46 years later because the original intention of the authors was misunderstood. A glance at Appendix B of @US1958 seems to confirm that notion. But, of course, without further knowledge this is just a hypothesis.
 
-
-
-
 # The Four-Parameter Beta Distributions
 
-Pert is based on the Beta distribution. While the standard definition of the beta distribution has a range of $[0, 1]$ a re-parametrized version with four parameters allows setting a range $[a, c]$, too. 
+Pert is based on the Beta distribution. While the standard definition of the beta distribution has a range of $[0, 1]$ a re-parametrized version with four parameters allows setting a range $[a, c]$, too.
 
 Mean [@enwiki1011418887; @Treat1983]
 
@@ -321,7 +325,8 @@ $$
 
 "Since the skewness and excess kurtosis are non-dimensional quantities (as moments centered on the mean and normalized by the standard deviation), they are independent of the parameters a and c" [@enwiki1011418887]
 
-Skewness [@Treat1983]
+Skewness [@Treat1983] 
+
 $$
 \mu_3 = \frac{2 (\beta-\alpha) \sqrt{\alpha+\beta+1}}{(\alpha+\beta+2)\sqrt{\alpha\beta}}
 $$
@@ -335,5 +340,12 @@ $$
 $$
 
 
+<!--
+# lsjhkfksjgfhsj
+
+$$
+a^3 + (36 r^3 - 36 r^2 + 7r)a^2 - 20 r^2 a - 24 r^3 = 0
+$$
+-->
 
 # References

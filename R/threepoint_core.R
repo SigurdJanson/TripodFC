@@ -46,7 +46,8 @@ library(mc2d)
 #' β = 1 + k * (c − b) / (c − a)
 #' 
 #' Vose: Vose (2008) describes a different formula for α:
-#'    α = (mean - a) * (2 * m - a - b) / { (m - mean) * (b - a) }
+#'    α = (mean - a) * (2 * m - a - b) / ( (m - mean) * (b - a) )
+#'    β = α * (c - mean) / (mean - a)
 #' 
 #' Mean and β are calculated using the standard formulas; as for the 
 #' classical PERT, the resulting distribution is a 4-parameter Beta 
