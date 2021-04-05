@@ -1,7 +1,7 @@
 ---
 title: "Insights about Pert"
 author: "Dr. Jan Seifert"
-date: "30 3 2021"
+date: "05-04-2021"
 output: html_document
 bibliography: ["pert.bib"]
 biblio-style: "apalike"
@@ -14,7 +14,9 @@ knitr::opts_chunk$set(echo = TRUE)
 source("../R/threepoint_core.R")
 ```
 
-A Pert distribution with a range from $a$ to $c$ and a mode of $b$. This note book tries to solve some puzzles regarding the Pert distribution. There is a lot of discussion in the literature regarding some shortcomings of the Pert distribution. Mainly because the standard deviation would not be fixed to 1/6th like the original authors claimed [@US1958].
+This note book tries to solve some puzzles regarding the Pert distribution. There is a lot of discussion in the literature regarding some shortcomings of the Pert distribution. Mainly because the standard deviation would not be fixed to 1/6th like the original authors claimed [@US1958].
+
+For this investigation, assume a Pert distribution with a range from $a$ to $c$ and a mode of $b$.
 
 
 
@@ -57,35 +59,29 @@ $$
 \sigma^2 = \frac{(\mu-a)(c-\mu)}{7}
 $$
 
-Given the above formula of the Pert mean and the fact that the standard deviation is the square root of the variance this is the exact formula.
 
-$$
-\sigma = 
-\sqrt{\frac{(\mu-a)(c-\mu)}{7}} 
-$$
-<!--= \\ \frac{1}{6} \cdot \sqrt{ \frac{5 a^2 + 16ab - 26ac - 16b^2 + 16bc + 5 c^2}{7} }-->
 
 For demonstration purposes let us simplify this by setting the min $a=0$ and the max value $c=1$. That leaves:
 
 $$
-\sigma = 
-\frac{1}{6} \cdot \sqrt{ \frac{- 16b^2 + 16b + 5}{7} } = \frac{1}{6} \cdot \sqrt{ \frac{5 - 16 (b - 1) b}{7} }
+\sigma^2 = 
+\frac{1}{36} \cdot \frac{- 16b^2 + 16b + 5}{7} = \frac{1}{36} \cdot \frac{5 - 16 (b - 1) b}{7}
 $$
 
-```{r Sigma Plot, echo=FALSE}
+```{r Plot Variances of Beta, echo=FALSE}
 library(ggplot2)
 b <- seq(0, 1, 0.05)
-sigma <- sqrt( (5-16*(b-1)*b) / 7 ) / 6
-data <- data.frame(b, sigma)
-ggplot(data, aes(x = b, y = sigma)) + 
+Variance <- (5-16*(b-1)*b) / 7 / 36
+data <- data.frame(b, Variance)
+ggplot(data, aes(x = b, y = Variance)) + 
   geom_line() +
-  geom_hline(yintercept=1/6, linetype="dashed") + #, color = "red"
+  geom_hline(yintercept=1/36, linetype="dashed", color = "darkgray") +
   ggtitle("True Standard Deviation of the Beta Distribution") +
-  scale_x_continuous(name="Mode b") + scale_y_continuous(name="Standard Deviation") +
+  scale_x_continuous(name="Mode b") + scale_y_continuous(name="Variance") +
   theme_linedraw()
 ```
 
-As we can see the standard deviation depends on the most likely estimate $b$. It ranges around 1/6 = `r format(1/6, digits=2, nsmall = 3)` (shown by the dashed line) from `r format(min(sigma), digits=2, nsmall = 3)` to `r format(max(sigma), digits=2, nsmall = 3)`. Such variations are why @Farnum1987 warned about using the approximation in extreme cases when the most-likely estimate is close to the minimum or maximum, i. e. close than 13% of the total range.
+As we can see the variance depends on the most likely estimate $b$. It ranges around 1/6 = `r format(1/6, digits=2, nsmall = 3)` (shown by the dashed line) from `r format(min(Variance), digits=2, nsmall = 3)` to `r format(max(Variance), digits=2, nsmall = 3)`. Such variations are why @Farnum1987 warned about using the approximation in extreme cases when the most-likely estimate is close to the minimum or maximum, i. e. close than 13% of the total range.
 
 
 However, the above equations have been set up under one assumption: a certain way to calculate the α and β shape parameters of the beta distribution.
@@ -95,7 +91,7 @@ In terms of the beta distribution the variance is:
 $$ \text{var}(X)(c-a)^2 = 
     \frac{\alpha\beta (c-a)^2} {(\alpha+\beta)^2(\alpha+\beta+1)} $$
 
-Again it is easy to see how the shape parameters of the beta distribution are related to the variance of the distribution. The α and β parameters of the beta distribution determine mean and variance of the distribution.
+Again it is easy to see how the shape parameters of the beta distribution are related to the variance of the distribution. The α and β parameters of the beta distribution determine mean and variance of this distribution. Everything stated above depends on that. Hence, further investigations are required.
 
 
 
@@ -111,7 +107,7 @@ How can these discrepancies be addressed? I found three approaches in the litera
 
 Only the first solution seems to be something other than a crutch. If we could really find a way to have the fixed standard deviation why should we not go for it? If we solve the equations for a simple example it becomes clear that there is a discrepancy. The plot shows the variances (y-axis) depending on mode (x-axis), and the parametrization method (colour). The variances of Davis and Vose have been moved a little bit to the right because it would not be possible to distinguish those from other equations.
 
-```{r echo=FALSE}
+```{r Plot Deviation from Variance, echo=FALSE}
 library(ggplot2)
 min <- -1
 max <- +1
@@ -119,17 +115,13 @@ shape <- 4
 
 mode <- seq(min, max, 0.05)
 
-# Compute approximate value
-#mu <- (min + shape * mode + max)/(shape + 2)
-#stdev <- (max-min) / 6
-
 Data <- data.frame(Mode = numeric(), 
                    Mean = numeric(), 
                    Var = numeric(), 
                    Method = character())
-Jitter  <- c(classic = -0.02, golgin = -0.04, vose = 0.03, davis = 0.04, Theoretical = 0.00)
+Jitter  <- c(classic = -0.02, golgin = 0.00, vose = 0.02, davis = -0.01, Theoretical = 0.01)
 
-# Compute using different paramtrization methods
+# Compute using different parametrization methods
 for (m in c("classic", "golgin", "vose", "davis")) {
   Params <- Pert2BetaParams(min, mode, max, shape, m)
   tMean  <- Params$alpha / (Params$alpha+Params$beta) * (max-min) + min
@@ -151,7 +143,7 @@ Data <- rbind(Data, data.frame(Mode = mode + Jitter[m],
 ggplot(Data, aes(x = Mode, y = Var, colour = Method)) +
   geom_line(size = 3/4) + theme_linedraw() + 
   scale_color_manual(values = c("sienna1", "tan4", "hotpink1", "black", "darkmagenta")) + 
-  labs(x = "Var", y = "Mode")
+  labs(x = "Var", y = "Mode b")
 ```
 
 As we can see the parametrization @Davis2008 works. He proposes a new way to estimate the α and β parameters of the beta distribution to make sure that mean and standard deviation are fixed to the defined values:
@@ -163,17 +155,16 @@ $$   \beta = \alpha \cdot \frac{5c-4b-a}{c+4b-5a} $$
 
 What is most interesting and baffling is the observation that the classic parametrization of the beta distribution shows the exact same pattern, i.e. no deviation from a fixed variance of 1/36.
 
-```{r}
-Jitter  <- c(classic = -0.02, golgin = 0.02, vose = 0.04, davis = 0.06, Theoretical = 0.00)
+```{r Plot Deviation from Mean, echo=FALSE}
 ggplot(Data, aes(x = Mode, y = Mean, colour = Method)) +
   geom_line(size = 3/4) + theme_linedraw() + 
   scale_color_manual(values = c("sienna1", "tan4", "hotpink1", "black", "darkmagenta")) + 
-  labs(x = "Mean", y = "Mode")
+  labs(x = "Mode", y = "Mean")
 ```
 
-A similar experiment with distribution means shows no deviation from the mean. Regardless of the parametrization method
+A similar experiment with distribution means shows no deviation from the mean. Regardless of the parametrization method. All parametrization methods handle the mean well.
 
-All in all, @Davis2008 handles the inconsistency. It is probably better to avoid the `pert` distribution family of the [mc2d](https://rdrr.io/cran/mc2d/) [@Pouillot2010a] package. Instead, compute α and β using the equations from @Davis2008 and use the generalized [beta distribution (betagen)](https://rdrr.io/cran/mc2d/man/betagen.html) instead.
+All in all, @Davis2008 handles the inconsistency of incorrect variances. It is probably better to avoid the `pert` distribution family of the [mc2d](https://rdrr.io/cran/mc2d/) [@Pouillot2010a] package. Instead, compute α and β using the equations from @Davis2008 and use the generalized [beta distribution (betagen)](https://rdrr.io/cran/mc2d/man/betagen.html) instead.
 
 
 
@@ -185,13 +176,139 @@ $$ Median = \frac{(a + 6*b + c)}{8} $$
 
 The actual definition of the median is
 
-$$ I_{\frac {1}{2}}^{[-1]}(\alpha, \beta ) (c-a) + a $$ for which the regularized incomplete beta function
+$$ I_{\frac {1}{2}}^{[-1]}(\alpha, \beta ) \cdot (c-a) + a $$ 
 
-$$ {\displaystyle I_{x}(\alpha,\beta )={\tfrac {1}{2}}}I_x(\alpha,\beta) = \tfrac{1}{2}$$.
+for which the regularized incomplete beta function
 
-However, there is no general closed-form expression for the median of the beta distribution for arbitrary values of α and β. Yet, it can easily be done in R with `qbeta(0.5, alpha, beta) * (c - a) + a`.
+$$ {\displaystyle I_{x}(\alpha,\beta )={\tfrac{1}{2}}}I_x(\alpha,\beta) = \tfrac{1}{2}$$.
 
-# Parametrization of the Beta distributions
+There is no general closed-form expression for the median of the beta distribution for arbitrary values of α and β. Yet, it can easily be done in R with `qbeta(0.5, alpha, beta) * (c - a) + a`.
+
+What is even more important is the question what the median has to do with the question of properly parametrizing the Beta distribution? Nothing, it seems.
+
+
+
+
+## Mode
+
+We already identified that we can get mean and standard deviation as defined by Pert if we parametrize the Beta distribution correctly. I finally want to verify that the mode is not changed by that.
+
+
+```{r Mode Simulations}
+library(ggplot2)
+Min <- -1
+Max <- +1
+shape <- 4
+
+stepsize <- 0.01
+investwidth <- 0.2 * (Max-Min)
+ModeSeq <- seq(Min, Max, 0.05)
+
+ModeData <- data.frame(TargetMode = numeric(), RealMode = numeric(), 
+                   Method = character())
+
+
+for (m in c("classic", "golgin", "vose", "davis")) {
+  
+  RealMode <- numeric()
+  
+  for (Mode in ModeSeq) {
+    # Check interval around designated mode
+    X <- seq(max(Min, Mode-investwidth), min(Max, Mode+investwidth), stepsize)
+    
+    Params <- Pert2BetaParams(Min, Mode, Max, shape, m)
+    Values <- dbeta((X - Min) / (Max - Min), Params$alpha, Params$beta)
+    RealMode <- c(RealMode, X[which.max(Values)])
+  }
+  ModeData <- rbind(ModeData, 
+                    data.frame(TargetMode = ModeSeq, 
+                               RealMode   = RealMode, 
+                               Method     = rep(m, length(ModeSeq))))
+}
+print(
+  ggplot(ModeData, aes(x = TargetMode, y = RealMode, colour = Method)) +
+  geom_line(size = 3/4) + theme_linedraw() + 
+  scale_color_manual(values = c("sienna1", "tan4", "hotpink1", "black", "darkmagenta")) + 
+  labs(x = "Expected Mode", y = "Mode Found")
+)
+```
+
+
+Two of the parametrization methods return a distribution exactly replicate the expected modes. These are @GolenkoGinzburg1988 ("golgin") and @Vose2008. The classic and Davis' approach lead to distortions especially at the edges.
+
+In sum, both parametrization methods have their advantages. While Davis' approach stabilizes the variance, Golenko-Ginzburg stabilizes the mode. The overview shows it. The table below shows the how the different parameters mean, mode, and variance deviate from the expected one. Davis' parametrization causes an 11% deviation from the expected mode. The plot above shows that the large deviations can be found at extreme modes, i.e. when the mode is close to the minimum or maximum.
+
+The deviation of the variances from their expected values is stronger. The highest deviation is almost 30% and the average is twice as high. We would have to establish what consequences these deviations have but at a first glance it looks like the version from Davis meets the specifications a lot better.
+
+
+
+```{r Table of Deviations, echo=FALSE}
+TheoreticalMean <- Data[Data$Method == "Theoretical",]$Mean
+TheoreticalVar  <- Data[Data$Method == "Theoretical",]$Var
+TheoreticalMode <- ModeData$TargetMode
+
+MaxDeviation <- data.frame(
+  Parameter = c("Mean", "Mode", "Variance"),
+  Classic = 
+    c(max(Data[Data$Method == "classic",]$Mean / TheoreticalMean, na.rm = TRUE),
+      max(ModeData[ModeData$Method == "classic",]$RealMode / TheoreticalMode, na.rm = TRUE),
+      max(Data[Data$Method == "classic",]$Var / TheoreticalVar, na.rm = TRUE)),
+  Davis = 
+    c(max(Data[Data$Method == "davis",]$Mean / TheoreticalMean, na.rm = TRUE),
+      max(ModeData[ModeData$Method == "davis",]$RealMode / TheoreticalMode, na.rm = TRUE),
+      max(Data[Data$Method == "davis",]$Var / TheoreticalVar, na.rm = TRUE)),
+  Golenko = 
+    c(max(Data[Data$Method == "golgin",]$Mean / TheoreticalMean, na.rm = TRUE),
+      max(ModeData[ModeData$Method == "golgin",]$RealMode / TheoreticalMode, na.rm = TRUE),
+      max(Data[Data$Method == "golgin",]$Var / TheoreticalVar, na.rm = TRUE)),
+  Vose = 
+    c(max(Data[Data$Method == "vose",]$Mean / TheoreticalMean, na.rm = TRUE),
+      max(ModeData[ModeData$Method == "vose",]$RealMode / TheoreticalMode, na.rm = TRUE),
+      max(Data[Data$Method == "vose",]$Var / TheoreticalVar, na.rm = TRUE))
+)
+
+MeanDeviation <- data.frame(
+  Parameter = c("Mean", "Mode", "Variance"),
+  Classic = 
+    c(mean(abs(Data[Data$Method == "classic",]$Mean / TheoreticalMean), na.rm = TRUE),
+      mean(abs(ModeData[ModeData$Method == "classic",]$RealMode / TheoreticalMode), na.rm = TRUE),
+      mean(abs(Data[Data$Method == "classic",]$Var / TheoreticalVar), na.rm = TRUE)),
+  Davis = 
+    c(mean(abs(Data[Data$Method == "davis",]$Mean / TheoreticalMean), na.rm = TRUE),
+      mean(abs(ModeData[ModeData$Method == "davis",]$RealMode / TheoreticalMode), na.rm = TRUE),
+      mean(abs(Data[Data$Method == "davis",]$Var / TheoreticalVar), na.rm = TRUE)),
+  Golenko = 
+    c(mean(abs(Data[Data$Method == "golgin",]$Mean / TheoreticalMean), na.rm = TRUE),
+      mean(abs(ModeData[ModeData$Method == "golgin",]$RealMode / TheoreticalMode), na.rm = TRUE),
+      mean(abs(Data[Data$Method == "golgin",]$Var / TheoreticalVar), na.rm = TRUE)),
+  Vose = 
+    c(mean(abs(Data[Data$Method == "vose",]$Mean / TheoreticalMean), na.rm = TRUE),
+      mean(abs(ModeData[ModeData$Method == "vose",]$RealMode / TheoreticalMode), na.rm = TRUE),
+      mean(abs(Data[Data$Method == "vose",]$Var / TheoreticalVar), na.rm = TRUE))
+)
+
+# Format columns
+for (clmn in 1:ncol(MaxDeviation))
+  if(is.numeric(MaxDeviation[[clmn]])) 
+    MaxDeviation[[clmn]] <- (MaxDeviation[[clmn]]-1) * 100
+
+for (clmn in 1:ncol(MeanDeviation))
+  if(is.numeric(MeanDeviation[[clmn]])) 
+    MeanDeviation[[clmn]] <- (MeanDeviation[[clmn]]-1) * 100
+
+# Output
+library(knitr); library(kableExtra); library(dplyr)
+kable(rbind(MaxDeviation, MeanDeviation),
+      digits = 3L, booktabs = TRUE,
+      caption	= "Deviation from the expected values",
+      label = "tbl:Deviations") %>% 
+  pack_rows(index = c("Maximum Deviation (%)" = 3, "Averaged Absolute Deviation (%)" = 3)) %>%
+  kable_styling(full_width = TRUE)
+```
+
+
+
+# Parametrizations of the Beta distributions
 
 ## Classic
 
@@ -205,6 +322,7 @@ $$
     \beta &= \alpha \cdot \frac{c - \mu}{\mu - a}
 \end{align*}
 $$
+
 
 ## Golenko-Ginzburg (GolGin)
 
@@ -238,6 +356,7 @@ $$
          &= 1 + \lambda * \frac{c − b}{c − a}
 \end{align*}
 $$
+
 
 ## Davis
 
@@ -306,6 +425,7 @@ Which could be the assumption capable of defining the Pert beta distribution. An
 > Then a beta distribution is determined, and one can convert the mode and extremes into the expected value and variance.
 
 That sounds like @Malcolm1959 and @Clark1962 had already done what @Davis2008 (re-?) invented 46 years later because the original intention of the authors was misunderstood. A glance at Appendix B of @US1958 seems to confirm that notion. But, of course, without further knowledge this is just a hypothesis.
+
 
 # The Four-Parameter Beta Distributions
 
