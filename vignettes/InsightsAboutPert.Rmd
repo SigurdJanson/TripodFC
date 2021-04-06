@@ -4,7 +4,8 @@ author: "Dr. Jan Seifert"
 date: "05-04-2021"
 output: html_document
 bibliography: ["pert.bib"]
-biblio-style: "apalike"
+#biblio-style: "apalike"
+csl: apa-6th-edition.csl
 link-citations: true
 ---
 
