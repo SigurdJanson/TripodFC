@@ -4,7 +4,7 @@ library(testthat)
 
 # GENERAL TESTS ------
 test_that("Do all methods return proper types", {
-  for (mt in c("classic", "vose", "davis")) {
+  for (mt in c("classic", "golgin", "vose", "davis")) {
     min  <- runif(1, -100, 100)
     max  <- min + runif(1, 0, 100)
     mode <- runif(1, min, max)
@@ -24,14 +24,56 @@ test_that("Do all methods return proper types", {
 })
 
 
+test_that("Symmetry", {
+  for (i in 1:10)
+    for (mt in c("classic", "golgin", "vose", "davis")) {
+      min  <- runif(1, -100, 0)
+      max  <- runif(1, min, 0)
+      mode <- (max+min) / 2
+      obs <- expect_silent(
+        Pert2BetaParams(min, mode, max, shape = 4, mt)
+      )
+      expect_equal(obs$alpha,  obs$beta)
+    }
+})
+
+test_that("Symmetry with varying shape", {
+  for (i in 1:10)
+    for (mt in c("classic", "golgin", "vose", "davis")) {
+      min  <- runif(1, -100, 0)
+      max  <- runif(1, min, 0)
+      mode <- (max+min) / 2
+      shape <- runif(1, 1, 10)
+      obs <- expect_silent(
+        Pert2BetaParams(min, mode, max, shape = 4, mt)
+      )
+      expect_equal(obs$alpha,  obs$beta)
+    }
+})
+
+
+
 # CLASSIC
+
+# example taken from 
+# http://prevalence.cbra.be/?main=functions&sub=betaPERT
+test_that("Classic: specific examples", {
+  min <- 0
+  max <- 50
+  mode <- 10
+  obs <- expect_silent(
+    Pert2BetaParams(min, mode, max, method = "classic")
+  )
+  expect_equal(obs$alpha, 1.968, 5E-4)
+  expect_equal(obs$beta,  4.592, 5E-4)
+})
 
 
 # GOLENKO-GINZBURG  -------
 
 # example taken from 
 # https://www.real-statistics.com/binomial-and-related-distributions/pert-distribution/
-test_that("Specific examples", {
+test_that("Golenko-Ginzburg: Specific examples", {
   min <- 1
   max <- 9
   mode <- 6
@@ -46,7 +88,18 @@ test_that("Specific examples", {
 
 # VOSE -------
 
-
+# example taken from 
+# http://prevalence.cbra.be/?main=functions&sub=betaPERT
+test_that("Vose: specific examples", {
+  min <- 0
+  max <- 50
+  mode <- 10
+  obs <- expect_silent(
+    Pert2BetaParams(min, mode, max, method = "vose")
+  )
+  expect_equal(obs$alpha, 1.8)
+  expect_equal(obs$beta,  4.2)
+})
 
 
 
